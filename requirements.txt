@@ -1,0 +1,6 @@
+modin==0.18.0
+numpy==1.22.3
+pandas==1.4.2
+polars==0.15.16
+psutil==5.9.3
+ray==2.2.0
