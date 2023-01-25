@@ -95,4 +95,4 @@ def format_perf_df(perf_df):
     perf_df_mean['mean_stats'] = np.round(perf_df_mean['values'],4)
     perf_df_mean.drop(columns = ['values'], inplace = True)
 
-    return perf_df_mean.pivot(index = 'operation', columns = ['stat','framework'], values = 'mean_stats')
+    return perf_df_mean.pivot(index = ['operation','stat'], columns = 'framework', values = 'mean_stats')
