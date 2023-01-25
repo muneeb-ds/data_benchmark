@@ -35,16 +35,16 @@ def pl_add_column(df, array):
 
 ## Date ranges
 @profile
-def pd_md_add_date_column(df):
-    pd_dates = pd.date_range(start = "2020-01-01", periods = df.shape[0])
-    df['date'] = pd_dates
-    return df
+def pd_md_get_date_range(df):
+    pd_dates = pd.date_range(start = "1990-01-01", end = "2050-12-31")
+    # df['date'] = pd_dates
+    return pd_dates
 
 @profile
-def pl_add_date_column(df):
-    pl_dates = pl.date_range(low = datetime(2020, 1,1), high = datetime(2020,1,1)+timedelta(days = df.shape[0]), interval = '1d', closed = "left")
-    df = df.with_columns([pl_dates.alias("date")])
-    return df
+def pl_get_date_range(df):
+    pl_dates = pl.date_range(low = datetime(1990, 1,1), high = datetime(2050,12,31), interval = '1d', closed = "left")
+    # df = df.with_columns([pl_dates.alias("date")])
+    return pl_dates
 
 @profile
 def col_mean(df, filter_col):

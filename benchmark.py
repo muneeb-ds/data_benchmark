@@ -31,10 +31,10 @@ def track_operations_perf(i):
 
     perf_track.combine_stats([stats_pd, stats_md, stats_pl], operation)
 
-    df_pd, stats_pd= pd_md_add_date_column(df_pd)
-    df_md, stats_pd= pd_md_add_date_column(df_md)
-    df_pl, stats_pd= pl_add_date_column(df_pl)
-    operation = "get date range and add its column"
+    _, stats_pd= pd_md_get_date_range(df_pd)
+    _, stats_pd= pd_md_get_date_range(df_md)
+    _, stats_pd= pl_get_date_range(df_pl)
+    operation = "get date range"
 
     perf_track.combine_stats([stats_pd, stats_md, stats_pl], operation)
                                 
