@@ -5,8 +5,11 @@ from operations import PerformanceTracker
 args = argument_parser()
 ITERS = args.iterations
 
-frameworks = [cls(args) for cls in PerformanceTracker.__subclasses__()
-                if cls.__name__.split("Bench")[0].lower() in args.frameworks]
+frameworks = [
+    cls(args)
+    for cls in PerformanceTracker.__subclasses__()
+    if cls.__name__.split("Bench")[0].lower() in args.frameworks
+]
 
 perf_df = pd.DataFrame()
 for iter in range(ITERS):
