@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import modin.pandas as md
 import polars as pl
+import ray
 
 from utils import profile, create_dataframe_dict, remove_parquets
 
@@ -236,7 +237,11 @@ class PandasBench(PerformanceTracker):
         return stats_df
 
 
-class ModinBench(PandasBench):
+class ModinBench(PandasBench, PerformanceTracker):
+    def __init__(self, args):
+        super().__init__(args)
+        ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
+
     @profile
     def create_df(self, df_dict):
         return md.DataFrame(df_dict)

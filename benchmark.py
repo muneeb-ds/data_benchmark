@@ -1,26 +1,12 @@
 from utils import argument_parser, format_perf_df
 import pandas as pd
-from operations import PandasBench, ModinBench, PolarsBench
-import ray
-
-ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
+from operations import PerformanceTracker
 
 args = argument_parser()
-
 ITERS = args.iterations
 
-frameworks = []
-if not args.frameworks:
-    frameworks += [PandasBench(args), ModinBench(args), PolarsBench(args)]
-else:
-    for f in args.frameworks:
-        if f == "pandas":
-            frameworks.append(PandasBench(args))
-        if f == "modin":
-            frameworks.append(ModinBench(args))
-        if f == "polars":
-            frameworks.append(PolarsBench(args))
-
+frameworks = [cls(args) for cls in PerformanceTracker.__subclasses__()
+                if cls.__name__.split("Bench")[0].lower() in args.frameworks]
 
 perf_df = pd.DataFrame()
 for iter in range(ITERS):
