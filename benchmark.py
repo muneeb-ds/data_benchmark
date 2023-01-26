@@ -9,7 +9,19 @@ args = argument_parser()
 
 ITERS = args.iterations
 
-frameworks = [PandasBench(args), ModinBench(args), PolarsBench(args)]
+frameworks = []
+if not args.frameworks:
+    frameworks += [PandasBench(args), ModinBench(args), PolarsBench(args)]
+else:
+    for f in args.frameworks:
+        if f == "pandas":
+            frameworks.append(PandasBench(args))
+        if f == "modin":
+            frameworks.append(ModinBench(args))
+        if f == "polars":
+            frameworks.append(PolarsBench(args))
+
+
 
 perf_df = pd.DataFrame()
 for iter in range(ITERS):

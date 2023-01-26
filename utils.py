@@ -22,6 +22,10 @@ def argument_parser():
                         type= int,
                         default=1,
                         help = "number of iterations to run for all operations")
+    parser.add_argument("--frameworks",
+                        nargs="*",
+                        help="frameworks to benchmark on (pandas, modin & polars supported)",
+                        choices=['pandas', 'modin','polars'])
     args = parser.parse_args()
 
     return args
