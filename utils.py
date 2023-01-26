@@ -5,28 +5,6 @@ import shutil
 import pandas as pd
 import numpy as np
 
-class PerformanceTracker:
-    def __init__(self) -> None:
-        self.performance_df = pd.DataFrame()
-        self.performance_dict = {}
-        self.performance_dict['pandas'] = {}
-        self.performance_dict['modin'] = {}
-        self.performance_dict['polars'] = {}
-
-    def add(self, stats, framework):
-        self.performance_dict[framework]['memory_usage (MB)'] = stats[0]
-        self.performance_dict[framework]['time_consumed (s)'] = stats[1]
-        return self
-    
-    def combine_stats(self, stats_list, operation):
-        self.performance_dict["operation"] = operation
-        self.add(stats_list[0], "pandas")
-        self.add(stats_list[1], "modin")
-        self.add(stats_list[2], "polars")
-        temp_df = pd.DataFrame(self.performance_dict)
-        self.performance_df = pd.concat([self.performance_df, temp_df], axis = 0)
-        return self
-
 def argument_parser():
     parser = argparse.ArgumentParser(description="benchmark arguments")
     parser.add_argument("--data_path",
@@ -91,8 +69,8 @@ def remove_parquets(path):
         return
     
 def format_perf_df(perf_df):
-    perf_df_mean = perf_df.groupby(['stat','operation','framework'], as_index = False)['values'].mean()
-    perf_df_mean['mean_stats'] = np.round(perf_df_mean['values'],4)
+    perf_df_mean = perf_df.groupby(['operation','framework','stat'], as_index = False)['values'].mean()
+    perf_df_mean['mean_stats']= np.round(perf_df_mean['values'],4)
     perf_df_mean.drop(columns = ['values'], inplace = True)
 
     return perf_df_mean.pivot(index = ['operation','stat'], columns = 'framework', values = 'mean_stats')
