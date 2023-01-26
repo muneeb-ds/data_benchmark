@@ -12,6 +12,7 @@ def argument_parser():
     parser.add_argument("--rows", type=int, default=1000, help="number of rows of created dataframe")
     parser.add_argument("--columns", type=int, default=1000, help="number of columns of created dataframe")
     parser.add_argument("--iterations", type=int, default=1, help="number of iterations to run for all operations")
+    parser.add_argument("--save_dir", default="", help="directory to save output benchmark csv")
     parser.add_argument(
         "--frameworks",
         default=["pandas", "modin", "polars"],

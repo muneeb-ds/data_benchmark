@@ -1,6 +1,8 @@
-from utils import argument_parser, format_perf_df
 import pandas as pd
+import os
+
 from operations import PerformanceTracker
+from utils import argument_parser, format_perf_df
 
 args = argument_parser()
 ITERS = args.iterations
@@ -22,4 +24,4 @@ for iter in range(ITERS):
     perf_df = pd.concat([perf_df, performance_df], axis=0)
 
 perf_df = format_perf_df(perf_df)
-perf_df.to_csv("performance_benchmarks.csv")
+perf_df.to_csv(os.path.join(args.save_dir,"performance_benchmarks.csv"))
