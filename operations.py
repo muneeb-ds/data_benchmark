@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime
+import time
 import numpy as np
 import pandas as pd
-import modin.pandas as md
-import polars as pl
-import ray
 
 from utils import profile, create_dataframe_dict, remove_parquets
 
@@ -89,6 +87,7 @@ class PerformanceTracker(ABC):
         pass
 
     def run_operations(self):
+        t0 = time.perf_counter()
         df, stats = self.read_csv(self.data_path)
         operation = f"reading csv of shape:{df.shape}"
 
@@ -164,16 +163,23 @@ class PerformanceTracker(ABC):
         operation = "save_to_parquet"
         self.add(stats, operation)
 
+        t_final = time.perf_counter() - t0
+        operation = "Total"
+        self.add((np.NaN, t_final), operation)
+
         perf_df = self.get_stats_df()
 
         return perf_df
 
 
 class PandasBench(PerformanceTracker):
-    ## READ CSV
+    def __init__(self, args) -> None:
+        self.pd = __import__("pandas")
+        super().__init__(args)
+
     @profile
     def read_csv(self, path):
-        df = pd.read_csv(path)
+        df = self.pd.read_csv(path)
         return df
 
     @profile
@@ -183,7 +189,7 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def get_date_range(self):
-        pd_dates = pd.date_range(start="1990-01-01", end="2050-12-31")
+        pd_dates = self.pd.date_range(start="1990-01-01", end="2050-12-31")
         return pd_dates
 
     @profile
@@ -198,7 +204,7 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def merge(self, left, right, on):
-        return pd.merge(left, right, on=[on], how="left")
+        return self.pd.merge(left, right, on=[on], how="left")
 
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
@@ -209,7 +215,7 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def concat(self, df_1, df_2):
-        return pd.concat([df_1, df_2], axis=0)
+        return self.pd.concat([df_1, df_2], axis=0)
 
     @profile
     def fill_na(self, df):
@@ -221,7 +227,7 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def create_df(self, df_dict):
-        return pd.DataFrame(df_dict)
+        return self.pd.DataFrame(df_dict)
 
     @profile
     def save_to_csv(self, df):
@@ -239,37 +245,40 @@ class PandasBench(PerformanceTracker):
 
 class ModinBench(PandasBench, PerformanceTracker):
     def __init__(self, args):
-        super().__init__(args)
+        self.md = __import__("modin.pandas", fromlist=["pandas"])
+        import ray
+
         ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
+        PerformanceTracker.__init__(self, args)
 
     @profile
     def create_df(self, df_dict):
-        return md.DataFrame(df_dict)
+        return self.md.DataFrame(df_dict)
 
     @profile
     def read_csv(self, path):
-        df = md.read_csv(path)
+        df = self.md.read_csv(path)
         return df
 
     @profile
     def get_date_range(self):
-        pd_dates = md.date_range(start="1990-01-01", end="2050-12-31")
+        pd_dates = self.md.date_range(start="1990-01-01", end="2050-12-31")
         return pd_dates
 
     @profile
     def merge(self, left, right, on):
-        return md.merge(left, right, on=[on], how="left")
+        return self.md.merge(left, right, on=[on], how="left")
 
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
         grouped = df.groupby([groupby_col], as_index=False).agg(
             agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
         )
-        return md.merge(df, grouped, on=[groupby_col], how="left")
+        return self.md.merge(df, grouped, on=[groupby_col], how="left")
 
     @profile
     def concat(self, df_1, df_2):
-        return md.concat([df_1, df_2], axis=0)
+        return self.md.concat([df_1, df_2], axis=0)
 
     def get_stats_df(self):
         stats_df = super().get_stats_df()
@@ -278,24 +287,30 @@ class ModinBench(PandasBench, PerformanceTracker):
 
 
 class PolarsBench(PerformanceTracker):
+    def __init__(self, args) -> None:
+        self.pl = __import__("polars")
+        super().__init__(args)
+
     @profile
     def read_csv(self, path):
-        df = pl.read_csv(path)
+        df = self.pl.read_csv(path)
         return df
 
     @profile
     def add_column(self, df, array):
-        df = df.with_columns([pl.Series(array).alias("rand_num")])
+        df = df.with_columns([self.pl.Series(array).alias("rand_num")])
         return df
 
     @profile
     def get_date_range(self):
-        pl_dates = pl.date_range(low=datetime(1990, 1, 1), high=datetime(2050, 12, 31), interval="1d", closed="left")
+        pl_dates = self.pl.date_range(
+            low=datetime(1990, 1, 1), high=datetime(2050, 12, 31), interval="1d", closed="left"
+        )
         return pl_dates
 
     @profile
     def filter_vals(self, df, filter_col, filter_val):
-        return df.filter(pl.col(filter_col) > filter_val)
+        return df.filter(self.pl.col(filter_col) > filter_val)
 
     @profile
     def groupby(self, df, groupby_col, agg_col):
@@ -304,9 +319,9 @@ class PolarsBench(PerformanceTracker):
             .groupby(groupby_col)
             .agg(
                 [
-                    pl.col(agg_col).sum().suffix("_sum"),
-                    pl.col(agg_col).mean().suffix("_mean"),
-                    pl.col(agg_col).std().suffix("_std"),
+                    self.pl.col(agg_col).sum().suffix("_sum"),
+                    self.pl.col(agg_col).mean().suffix("_mean"),
+                    self.pl.col(agg_col).std().suffix("_std"),
                 ]
             )
         )
@@ -321,15 +336,15 @@ class PolarsBench(PerformanceTracker):
     def groupby_merge(self, df, groupby_col, agg_col):
         return df.select(
             [
-                pl.all(),
-                pl.col(agg_col).sum().over(groupby_col).alias(f"{agg_col}_sum"),
-                pl.col(agg_col).mean().over(groupby_col).alias(f"{agg_col}_mean"),
+                self.pl.all(),
+                self.pl.col(agg_col).sum().over(groupby_col).alias(f"{agg_col}_sum"),
+                self.pl.col(agg_col).mean().over(groupby_col).alias(f"{agg_col}_mean"),
             ]
         )
 
     @profile
     def concat(self, df_1, df_2):
-        return pl.concat([df_1, df_2], how="diagonal")
+        return self.pl.concat([df_1, df_2], how="diagonal")
 
     @profile
     def fill_na(self, df):
@@ -341,7 +356,7 @@ class PolarsBench(PerformanceTracker):
 
     @profile
     def create_df(self, df_dict):
-        return pl.from_dict(df_dict)
+        return self.pl.from_dict(df_dict)
 
     @profile
     def save_to_csv(self, df):
