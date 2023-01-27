@@ -33,6 +33,7 @@ class PerformanceTracker(ABC):
 
     def get_stats_df(self):
         self.performance_df = pd.DataFrame.from_dict(self.performance_dict, orient="index")
+        self.performance_df["framework"] = self.__class__.__name__.split("Bench")[0].lower()
         return self.performance_df
 
     @abstractmethod
@@ -167,7 +168,7 @@ class PerformanceTracker(ABC):
 
         perf_df = self.get_stats_df()
 
-        del df, float_cols, filtered_df, grouped_df, merged_df, concat_df, new_df
+        del df, float_cols, filtered_df, grouped_df, merged_df, concat_df, new_df, rand_arr
         gc.collect()
 
         return perf_df
@@ -234,31 +235,37 @@ class PandasBench(PerformanceTracker):
     def save_to_parquet(self, df):
         df.to_parquet("sample_data.parquet", index=False)
 
-    def get_stats_df(self):
-        stats_df = super().get_stats_df()
-        stats_df["framework"] = "pandas"
-        return stats_df
-
     def run_operations(self):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.pd = __import__("pandas")
         return super().run_operations()
 
 
-class ModinBench(PandasBench, PerformanceTracker):
-    @profile
-    def create_df(self, df_dict):
-        return self.md.DataFrame(df_dict)
-
+class ModinBench(PerformanceTracker):
     @profile
     def read_csv(self, path):
         df = self.md.read_csv(path)
         return df
 
     @profile
+    def add_column(self, df, array):
+        df["rand_nums"] = array
+        return df
+
+    @profile
     def get_date_range(self):
         pd_dates = self.md.date_range(start="1990-01-01", end="2050-12-31")
         return pd_dates
+
+    @profile
+    def filter_vals(self, df, filter_col, filter_val):
+        return df.loc[df[filter_col] > filter_val, :]
+
+    @profile
+    def groupby(self, df, groupby_col, agg_col):
+        return df.groupby([groupby_col], as_index=False).agg(
+            agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
+        )
 
     @profile
     def merge(self, left, right, on):
@@ -275,10 +282,25 @@ class ModinBench(PandasBench, PerformanceTracker):
     def concat(self, df_1, df_2):
         return self.md.concat([df_1, df_2], axis=0)
 
-    def get_stats_df(self):
-        stats_df = super().get_stats_df()
-        stats_df["framework"] = "modin"
-        return stats_df
+    @profile
+    def fill_na(self, df):
+        df.fillna(0)
+
+    @profile
+    def drop_na(self, df):
+        df.dropna()
+
+    @profile
+    def create_df(self, df_dict):
+        return self.md.DataFrame(df_dict)
+
+    @profile
+    def save_to_csv(self, df):
+        df.to_csv("sample_data.csv", index=False)
+
+    @profile
+    def save_to_parquet(self, df):
+        df.to_parquet("sample_data.parquet", index=False)
 
     def run_operations(self):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
@@ -290,7 +312,6 @@ class ModinBench(PandasBench, PerformanceTracker):
             ignore_reinit_error=True,
         )
         perf_df = super().run_operations()
-
         return perf_df
 
 
@@ -369,11 +390,6 @@ class PolarsBench(PerformanceTracker):
     @profile
     def save_to_parquet(self, df):
         df.write_parquet("sample_data.parquet")
-
-    def get_stats_df(self):
-        stats_df = super().get_stats_df()
-        stats_df["framework"] = "polars"
-        return stats_df
 
     def run_operations(self):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
