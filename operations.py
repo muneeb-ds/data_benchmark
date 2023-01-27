@@ -3,8 +3,11 @@ from datetime import datetime
 import time
 import numpy as np
 import pandas as pd
+import logging
 
 from utils import profile, create_dataframe_dict, remove_parquets
+
+logger = logging.getLogger(__name__)
 
 
 class PerformanceTracker(ABC):
@@ -88,85 +91,103 @@ class PerformanceTracker(ABC):
 
     def run_operations(self):
         t0 = time.perf_counter()
+
         df, stats = self.read_csv(self.data_path)
         operation = f"reading csv of shape:{df.shape}"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
 
         self.add(stats, operation)
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
 
-        df, stats = self.add_column(df, rand_arr)
         operation = "add column"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        df, stats = self.add_column(df, rand_arr)
         self.add(stats, operation)
 
-        _, stats = self.get_date_range()
         operation = "get date range"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.get_date_range()
         self.add(stats, operation)
 
         float_cols = [col for col in df.columns if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]]
 
         filter_col = np.random.choice(float_cols)
 
-        filter_val, stats = self.col_mean(df, filter_col)
         operation = "get column mean val"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        filter_val, stats = self.col_mean(df, filter_col)
         self.add(stats, operation)
 
-        filtered_df, stats = self.filter_vals(df, filter_col, filter_val)
         operation = "filter values based on col mean"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        filtered_df, stats = self.filter_vals(df, filter_col, filter_val)
         self.add(stats, operation)
 
         df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
         groupby_col = np.random.choice(df_str_cols)
 
-        grouped_df, stats = self.groupby(df, groupby_col, filter_col)
         operation = "groupby aggregation (sum, mean, std)"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        grouped_df, stats = self.groupby(df, groupby_col, filter_col)
         self.add(stats, operation)
 
-        merged_df, stats = self.merge(df, grouped_df, groupby_col)
         operation = "merging grouped col to original df"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        merged_df, stats = self.merge(df, grouped_df, groupby_col)
         self.add(stats, operation)
 
-        merged_df, stats = self.groupby_merge(df, groupby_col, filter_col)
         operation = "combined groupby merge"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        merged_df, stats = self.groupby_merge(df, groupby_col, filter_col)
         self.add(stats, operation)
 
-        concat_df, stats = self.concat(merged_df, filtered_df)
         operation = "horizontal concatenatenation"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        concat_df, stats = self.concat(merged_df, filtered_df)
         self.add(stats, operation)
 
-        _, stats = self.fill_na(concat_df)
         operation = "fill nulls with 0"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.fill_na(concat_df)
         self.add(stats, operation)
 
-        _, stats = self.drop_na(concat_df)
         operation = "drop nulls"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.drop_na(concat_df)
         self.add(stats, operation)
 
         df_dict = create_dataframe_dict(self.row_size, self.column_size)
 
-        new_df, stats = self.create_df(df_dict)
         operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        new_df, stats = self.create_df(df_dict)
         self.add(stats, operation)
 
-        _, stats = self.describe_df(new_df)
         operation = "describe stats of df"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.describe_df(new_df)
         self.add(stats, operation)
 
-        _, stats = self.save_to_csv(new_df)
         operation = "save to csv"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.save_to_csv(new_df)
         self.add(stats, operation)
 
         parquet_path = "sample_data.parquet"
         remove_parquets(parquet_path)
 
-        _, stats = self.save_to_parquet(new_df)
         operation = "save_to_parquet"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        _, stats = self.save_to_parquet(new_df)
         self.add(stats, operation)
 
         t_final = time.perf_counter() - t0
-        operation = "Total"
+        operation = "Total stats"
+        logger.critical(f"{self.__class__.__name__}: {operation}")
         self.add((np.NaN, t_final), operation)
 
+        logger.critical(f"{self.__class__.__name__}: combining stats")
         perf_df = self.get_stats_df()
 
         return perf_df
