@@ -195,6 +195,7 @@ class PerformanceTracker(ABC):
 
 class PandasBench(PerformanceTracker):
     def __init__(self, args) -> None:
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.pd = __import__("pandas")
         super().__init__(args)
 
@@ -266,6 +267,7 @@ class PandasBench(PerformanceTracker):
 
 class ModinBench(PandasBench, PerformanceTracker):
     def __init__(self, args):
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.md = __import__("modin.pandas", fromlist=["pandas"])
         import ray
 
@@ -309,6 +311,7 @@ class ModinBench(PandasBench, PerformanceTracker):
 
 class PolarsBench(PerformanceTracker):
     def __init__(self, args) -> None:
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.pl = __import__("polars")
         super().__init__(args)
 
