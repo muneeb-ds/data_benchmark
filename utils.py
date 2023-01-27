@@ -1,5 +1,6 @@
 import argparse
 import os, psutil
+import tracemalloc
 from time import perf_counter
 import shutil
 import pandas as pd
@@ -36,10 +37,12 @@ def profile(func):
 
     def wrapper(*args, **kwargs):
 
-        mem_before = get_mem_usage()
         start = perf_counter()
+        tracemalloc.start()
         result = func(*args, **kwargs)
-        mem_after = round(get_mem_usage() - mem_before, 2)
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        mem_after = round(peak/10**6, 2)
         elapsed_time = round(elapsed_since(start), 4)
         return result, (mem_after, elapsed_time)
 
