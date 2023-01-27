@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+import gc
 import time
 import numpy as np
 import pandas as pd
@@ -189,6 +190,9 @@ class PerformanceTracker(ABC):
 
         logger.critical(f"{self.__class__.__name__}: combining stats")
         perf_df = self.get_stats_df()
+
+        del df, float_cols, filtered_df, grouped_df, merged_df, concat_df, new_df
+        gc.collect()
 
         return perf_df
 
