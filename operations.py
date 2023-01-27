@@ -273,9 +273,9 @@ class ModinBench(PandasBench, PerformanceTracker):
     def __init__(self, args):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.md = __import__("modin.pandas", fromlist=["pandas"])
-        import ray
+        self.ray = __import__("ray")
+        self.ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
 
-        ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
         PerformanceTracker.__init__(self, args)
 
     @profile
@@ -311,6 +311,14 @@ class ModinBench(PandasBench, PerformanceTracker):
         stats_df = super().get_stats_df()
         stats_df["framework"] = "modin"
         return stats_df
+    
+    def run_operations(self):
+        perf_df = super().run_operations()
+        if self.ray.is_initialized():
+            logger.critical("Shutting down ray")
+            self.ray.shutdown()
+            
+        return perf_df
 
 
 class PolarsBench(PerformanceTracker):
