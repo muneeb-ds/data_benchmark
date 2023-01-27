@@ -25,6 +25,12 @@ class PerformanceTracker(ABC):
         self.performance_dict[operation]["time_consumed (S)"] = stats[1]
         return self
 
+    def get_operation_stat(self, operation, func, *args):
+        logger.critical(f"{self.__class__.__name__}: {operation}")
+        output, stats = func(*args)
+        self.add(stats, operation)
+        return output
+
     def get_stats_df(self):
         self.performance_df = pd.DataFrame.from_dict(self.performance_dict, orient="index")
         return self.performance_df
@@ -93,95 +99,64 @@ class PerformanceTracker(ABC):
     def run_operations(self):
         t0 = time.perf_counter()
 
-        df, stats = self.read_csv(self.data_path)
-        operation = f"reading csv of shape:{df.shape}"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-
-        self.add(stats, operation)
+        operation = f"reading csv"
+        df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
 
         operation = "add column"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        df, stats = self.add_column(df, rand_arr)
-        self.add(stats, operation)
+        df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
         operation = "get date range"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.get_date_range()
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.get_date_range)
 
         float_cols = [col for col in df.columns if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]]
 
         filter_col = np.random.choice(float_cols)
 
         operation = "get column mean val"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        filter_val, stats = self.col_mean(df, filter_col)
-        self.add(stats, operation)
+        filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
 
         operation = "filter values based on col mean"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        filtered_df, stats = self.filter_vals(df, filter_col, filter_val)
-        self.add(stats, operation)
+        filtered_df = self.get_operation_stat(operation, self.filter_vals, df, filter_col, filter_val)
 
         df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
         groupby_col = np.random.choice(df_str_cols)
 
         operation = "groupby aggregation (sum, mean, std)"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        grouped_df, stats = self.groupby(df, groupby_col, filter_col)
-        self.add(stats, operation)
+        grouped_df = self.get_operation_stat(operation, self.groupby, df, groupby_col, filter_col)
 
         operation = "merging grouped col to original df"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        merged_df, stats = self.merge(df, grouped_df, groupby_col)
-        self.add(stats, operation)
+        merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
 
         operation = "combined groupby merge"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        merged_df, stats = self.groupby_merge(df, groupby_col, filter_col)
-        self.add(stats, operation)
+        merged_df = self.get_operation_stat(operation, self.groupby_merge, df, groupby_col, filter_col)
 
         operation = "horizontal concatenatenation"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        concat_df, stats = self.concat(merged_df, filtered_df)
-        self.add(stats, operation)
+        concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
 
         operation = "fill nulls with 0"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.fill_na(concat_df)
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.fill_na, concat_df)
 
         operation = "drop nulls"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.drop_na(concat_df)
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.drop_na, concat_df)
 
         df_dict = create_dataframe_dict(self.row_size, self.column_size)
 
         operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        new_df, stats = self.create_df(df_dict)
-        self.add(stats, operation)
+        new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
         operation = "describe stats of df"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.describe_df(new_df)
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.describe_df, new_df)
 
         operation = "save to csv"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.save_to_csv(new_df)
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.save_to_csv, new_df)
 
         parquet_path = "sample_data.parquet"
         remove_parquets(parquet_path)
 
         operation = "save_to_parquet"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
-        _, stats = self.save_to_parquet(new_df)
-        self.add(stats, operation)
+        _ = self.get_operation_stat(operation, self.save_to_parquet, new_df)
 
         t_final = time.perf_counter() - t0
         operation = "Total stats"
@@ -189,6 +164,7 @@ class PerformanceTracker(ABC):
         self.add((np.NaN, t_final), operation)
 
         logger.critical(f"{self.__class__.__name__}: combining stats")
+
         perf_df = self.get_stats_df()
 
         del df, float_cols, filtered_df, grouped_df, merged_df, concat_df, new_df
@@ -198,11 +174,6 @@ class PerformanceTracker(ABC):
 
 
 class PandasBench(PerformanceTracker):
-    def __init__(self, args) -> None:
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
-        self.pd = __import__("pandas")
-        super().__init__(args)
-
     @profile
     def read_csv(self, path):
         df = self.pd.read_csv(path)
@@ -268,16 +239,13 @@ class PandasBench(PerformanceTracker):
         stats_df["framework"] = "pandas"
         return stats_df
 
+    def run_operations(self):
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        self.pd = __import__("pandas")
+        return super().run_operations()
+
 
 class ModinBench(PandasBench, PerformanceTracker):
-    def __init__(self, args):
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
-        self.md = __import__("modin.pandas", fromlist=["pandas"])
-        self.ray = __import__("ray")
-        self.ray.init(runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}}, include_dashboard=False)
-
-        PerformanceTracker.__init__(self, args)
-
     @profile
     def create_df(self, df_dict):
         return self.md.DataFrame(df_dict)
@@ -311,22 +279,22 @@ class ModinBench(PandasBench, PerformanceTracker):
         stats_df = super().get_stats_df()
         stats_df["framework"] = "modin"
         return stats_df
-    
+
     def run_operations(self):
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        self.md = __import__("modin.pandas", fromlist=["pandas"])
+        self.ray = __import__("ray")
+        self.ray.init(
+            runtime_env={"env_vars": {"__MODIN_AUTOIMPORT_PANDAS__": "1"}},
+            include_dashboard=False,
+            ignore_reinit_error=True,
+        )
         perf_df = super().run_operations()
-        if self.ray.is_initialized():
-            logger.critical("Shutting down ray")
-            self.ray.shutdown()
-            
+
         return perf_df
 
 
 class PolarsBench(PerformanceTracker):
-    def __init__(self, args) -> None:
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
-        self.pl = __import__("polars")
-        super().__init__(args)
-
     @profile
     def read_csv(self, path):
         df = self.pl.read_csv(path)
@@ -406,3 +374,8 @@ class PolarsBench(PerformanceTracker):
         stats_df = super().get_stats_df()
         stats_df["framework"] = "polars"
         return stats_df
+
+    def run_operations(self):
+        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        self.pl = __import__("polars")
+        return super().run_operations()

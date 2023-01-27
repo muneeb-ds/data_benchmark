@@ -1,3 +1,4 @@
+import gc
 import pandas as pd
 import os
 import logging
@@ -9,15 +10,15 @@ logger = logging.getLogger(__name__)
 
 args = argument_parser()
 ITERS = args.iterations
+perf_df = pd.DataFrame()
 
-logger.critical("Starting Benchmarking...")
 frameworks = [
     cls(args)
     for cls in PerformanceTracker.__subclasses__()
     if cls.__name__.split("Bench")[0].lower() in args.frameworks
 ]
+logger.critical("Starting Benchmarking...")
 
-perf_df = pd.DataFrame()
 for iter in range(ITERS):
     logger.critical(f"Running iteration: {iter+1}")
     df_stats = [framework.run_operations() for framework in frameworks]
@@ -26,6 +27,8 @@ for iter in range(ITERS):
     performance_df = pd.melt(performance_df, id_vars=["operation", "framework"], var_name="stat", value_name="values")
     performance_df["iteration"] = iter
     perf_df = pd.concat([perf_df, performance_df], axis=0)
+    del df_stats
+    gc.collect()
 
 perf_df = format_perf_df(perf_df)
 perf_df.to_csv(os.path.join(args.save_dir, "performance_benchmarks.csv"))

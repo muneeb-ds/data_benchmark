@@ -42,7 +42,7 @@ def profile(func):
         result = func(*args, **kwargs)
         current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
-        mem_after = round(peak/10**6, 2)
+        mem_after = round(peak / 10**6, 2)
         elapsed_time = round(elapsed_since(start), 4)
         return result, (mem_after, elapsed_time)
 
