@@ -41,6 +41,10 @@ class PerformanceTracker(ABC):
         pass
 
     @abstractmethod
+    def read_parquet(self, path):
+        pass
+
+    @abstractmethod
     def add_column(self, df, array):
         pass
 
@@ -137,29 +141,33 @@ class PerformanceTracker(ABC):
         concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
 
         operation = "fill nulls with 0"
-        _ = self.get_operation_stat(operation, self.fill_na, concat_df)
+        concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
 
         operation = "drop nulls"
-        _ = self.get_operation_stat(operation, self.drop_na, concat_df)
+        concat_df = self.get_operation_stat(operation, self.drop_na, concat_df)
+
+        operation = "describe stats of df"
+        _ = self.get_operation_stat(operation, self.describe_df, concat_df)
+
+        operation = "save to csv"
+        _ = self.get_operation_stat(operation, self.save_to_csv, concat_df)
+
+        parquet_path = "sample_data.parquet"
+        remove_parquets(parquet_path)
+
+        operation = "save to parquet"
+        _ = self.get_operation_stat(operation, self.save_to_parquet, concat_df)
+
+        operation = "read from parquet"
+        _ = self.get_operation_stat(operation, self.read_parquet, parquet_path)
 
         df_dict = create_dataframe_dict(self.row_size, self.column_size)
 
         operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
         new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
-        operation = "describe stats of df"
-        _ = self.get_operation_stat(operation, self.describe_df, new_df)
-
-        operation = "save to csv"
-        _ = self.get_operation_stat(operation, self.save_to_csv, new_df)
-
-        parquet_path = "sample_data.parquet"
-        remove_parquets(parquet_path)
-
-        operation = "save_to_parquet"
-        _ = self.get_operation_stat(operation, self.save_to_parquet, new_df)
-
         t_final = time.perf_counter() - t0
+
         operation = "Total stats"
         logger.critical(f"{self.__class__.__name__}: {operation}")
         self.add((np.NaN, t_final), operation)
@@ -178,6 +186,11 @@ class PandasBench(PerformanceTracker):
     @profile
     def read_csv(self, path):
         df = self.pd.read_csv(path)
+        return df
+
+    @profile
+    def read_parquet(self, path):
+        df = self.pd.read_parquet(path)
         return df
 
     @profile
@@ -213,15 +226,16 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def concat(self, df_1, df_2):
-        return self.pd.concat([df_1, df_2], axis=0)
+        df_concat = self.pd.concat([df_1, df_2], axis=0)
+        return df_concat
 
     @profile
     def fill_na(self, df):
-        df.fillna(0)
+        return df.fillna(0)
 
     @profile
     def drop_na(self, df):
-        df.dropna()
+        return df.dropna()
 
     @profile
     def create_df(self, df_dict):
@@ -245,6 +259,11 @@ class ModinBench(PerformanceTracker):
     @profile
     def read_csv(self, path):
         df = self.md.read_csv(path)
+        return df
+    
+    @profile
+    def read_parquet(self, path):
+        df = self.md.read_parquet(path)
         return df
 
     @profile
@@ -284,11 +303,11 @@ class ModinBench(PerformanceTracker):
 
     @profile
     def fill_na(self, df):
-        df.fillna(0)
+        return df.fillna(0)
 
     @profile
     def drop_na(self, df):
-        df.dropna()
+        return df.dropna()
 
     @profile
     def create_df(self, df_dict):
@@ -319,6 +338,11 @@ class PolarsBench(PerformanceTracker):
     @profile
     def read_csv(self, path):
         df = self.pl.read_csv(path)
+        return df
+
+    @profile
+    def read_parquet(self, path):
+        df = self.pl.read_parquet(path)
         return df
 
     @profile
@@ -373,11 +397,11 @@ class PolarsBench(PerformanceTracker):
 
     @profile
     def fill_na(self, df):
-        df.fill_null(0)
+        return df.fill_null(0)
 
     @profile
     def drop_na(self, df):
-        df.drop_nulls()
+        return df.drop_nulls()
 
     @profile
     def create_df(self, df_dict):

@@ -12,14 +12,14 @@ args = argument_parser()
 ITERS = args.iterations
 perf_df = pd.DataFrame()
 
+frameworks = [
+    cls(args)
+    for cls in PerformanceTracker.__subclasses__()
+    if cls.__name__.split("Bench")[0].lower() in args.frameworks
+]
 logger.critical("Starting Benchmarking...")
 
 for iter in range(ITERS):
-    frameworks = [
-        cls(args)
-        for cls in PerformanceTracker.__subclasses__()
-        if cls.__name__.split("Bench")[0].lower() in args.frameworks
-    ]
     logger.critical(f"Running iteration: {iter+1}")
     df_stats = [framework.run_operations() for framework in frameworks]
     df_perf_stats = pd.concat(df_stats, axis=0)
@@ -27,7 +27,7 @@ for iter in range(ITERS):
     performance_df = pd.melt(performance_df, id_vars=["operation", "framework"], var_name="stat", value_name="values")
     performance_df["iteration"] = iter
     perf_df = pd.concat([perf_df, performance_df], axis=0)
-    del df_stats, frameworks
+    del df_stats
     gc.collect()
 
 perf_df = format_perf_df(perf_df)
