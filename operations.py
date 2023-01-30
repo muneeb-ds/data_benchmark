@@ -5,6 +5,8 @@ import time
 import numpy as np
 import pandas as pd
 import logging
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from utils import profile, create_dataframe_dict, remove_parquets
 
@@ -149,22 +151,29 @@ class PerformanceTracker(ABC):
         operation = "describe stats of df"
         _ = self.get_operation_stat(operation, self.describe_df, concat_df)
 
-        operation = "save to csv"
-        _ = self.get_operation_stat(operation, self.save_to_csv, concat_df)
-
         parquet_path = "sample_data.parquet"
         remove_parquets(parquet_path)
+
+        df_dict = create_dataframe_dict(self.row_size, self.column_size)
+
+        operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
+        new_df = self.get_operation_stat(operation, self.create_df, df_dict)
+
+        try:
+            concat_df[concat_df.select_dtypes(include=[object]).columns] = concat_df[
+                concat_df.select_dtypes(include=[object]).columns
+            ].astype(str)
+        except AttributeError:
+            pass
+
+        operation = "save to csv"
+        _ = self.get_operation_stat(operation, self.save_to_csv, concat_df)
 
         operation = "save to parquet"
         _ = self.get_operation_stat(operation, self.save_to_parquet, concat_df)
 
         operation = "read from parquet"
         _ = self.get_operation_stat(operation, self.read_parquet, parquet_path)
-
-        df_dict = create_dataframe_dict(self.row_size, self.column_size)
-
-        operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
-        new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
         t_final = time.perf_counter() - t0
 
@@ -247,7 +256,7 @@ class PandasBench(PerformanceTracker):
 
     @profile
     def save_to_parquet(self, df):
-        df.to_parquet("sample_data.parquet", index=False)
+        df.to_parquet("sample_data.parquet", index=False, engine="pyarrow")
 
     def run_operations(self):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
@@ -260,7 +269,7 @@ class ModinBench(PerformanceTracker):
     def read_csv(self, path):
         df = self.md.read_csv(path)
         return df
-    
+
     @profile
     def read_parquet(self, path):
         df = self.md.read_parquet(path)
@@ -319,7 +328,7 @@ class ModinBench(PerformanceTracker):
 
     @profile
     def save_to_parquet(self, df):
-        df.to_parquet("sample_data.parquet", index=False)
+        df.to_parquet("sample_data.parquet", index=False, engine="pyarrow")
 
     def run_operations(self):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
