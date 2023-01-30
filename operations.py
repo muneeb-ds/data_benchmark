@@ -154,11 +154,6 @@ class PerformanceTracker(ABC):
         parquet_path = "sample_data.parquet"
         remove_parquets(parquet_path)
 
-        df_dict = create_dataframe_dict(self.row_size, self.column_size)
-
-        operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
-        new_df = self.get_operation_stat(operation, self.create_df, df_dict)
-
         try:
             concat_df[concat_df.select_dtypes(include=[object]).columns] = concat_df[
                 concat_df.select_dtypes(include=[object]).columns
@@ -174,6 +169,11 @@ class PerformanceTracker(ABC):
 
         operation = "read from parquet"
         _ = self.get_operation_stat(operation, self.read_parquet, parquet_path)
+
+        df_dict = create_dataframe_dict(self.row_size, self.column_size)
+
+        operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
+        new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
         t_final = time.perf_counter() - t0
 
