@@ -1,6 +1,7 @@
 import argparse
 import os, psutil
 import tracemalloc
+from memory_profiler import memory_usage
 from time import perf_counter
 import shutil
 import pandas as pd
@@ -11,8 +12,18 @@ def argument_parser():
     parser = argparse.ArgumentParser(description="benchmark arguments")
     parser.add_argument("--data_path", required=True, help="path where csv to be read is saved")
     parser.add_argument("--rows", type=int, default=1000, help="number of rows of created dataframe")
-    parser.add_argument("--columns", type=int, default=1000, help="number of columns of created dataframe")
-    parser.add_argument("--iterations", type=int, default=1, help="number of iterations to run for all operations")
+    parser.add_argument(
+        "--columns",
+        type=int,
+        default=1000,
+        help="number of columns of created dataframe",
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+        help="number of iterations to run for all operations",
+    )
     parser.add_argument("--save_dir", default="", help="directory to save output benchmark csv")
     parser.add_argument(
         "--frameworks",
@@ -38,11 +49,8 @@ def profile(func):
     def wrapper(*args, **kwargs):
 
         start = perf_counter()
-        tracemalloc.start()
-        result = func(*args, **kwargs)
-        current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        mem_after = round(peak / 10**6, 2)
+        mem_after, result = memory_usage((func, args, kwargs), retval=True, max_usage=True)
+        mem_after = round(mem_after, 2)
         elapsed_time = round(elapsed_since(start), 4)
         return result, (mem_after, elapsed_time)
 
