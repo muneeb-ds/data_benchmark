@@ -34,8 +34,12 @@ class PerformanceTracker(ABC):
         return output
 
     def get_stats_df(self):
-        self.performance_df = pd.DataFrame.from_dict(self.performance_dict, orient="index")
-        self.performance_df["framework"] = self.__class__.__name__.split("Bench")[0].lower()
+        self.performance_df = pd.DataFrame.from_dict(
+            self.performance_dict, orient="index"
+        )
+        self.performance_df["framework"] = self.__class__.__name__.split("Bench")[
+            0
+        ].lower()
         return self.performance_df
 
     @abstractmethod
@@ -117,7 +121,11 @@ class PerformanceTracker(ABC):
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
 
-        float_cols = [col for col in df.columns if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]]
+        float_cols = [
+            col
+            for col in df.columns
+            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
+        ]
 
         filter_col = np.random.choice(float_cols)
 
@@ -125,22 +133,34 @@ class PerformanceTracker(ABC):
         filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
 
         operation = "filter values based on col mean"
-        filtered_df = self.get_operation_stat(operation, self.filter_vals, df, filter_col, filter_val)
+        filtered_df = self.get_operation_stat(
+            operation, self.filter_vals, df, filter_col, filter_val
+        )
 
-        df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
+        df_str_cols = [
+            col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]
+        ]
         groupby_col = np.random.choice(df_str_cols)
 
         operation = "groupby aggregation (sum, mean, std)"
-        grouped_df = self.get_operation_stat(operation, self.groupby, df, groupby_col, filter_col)
+        grouped_df = self.get_operation_stat(
+            operation, self.groupby, df, groupby_col, filter_col
+        )
 
         operation = "merging grouped col to original df"
-        merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
+        merged_df = self.get_operation_stat(
+            operation, self.merge, df, grouped_df, groupby_col
+        )
 
         operation = "combined groupby merge"
-        merged_df = self.get_operation_stat(operation, self.groupby_merge, df, groupby_col, filter_col)
+        merged_df = self.get_operation_stat(
+            operation, self.groupby_merge, df, groupby_col, filter_col
+        )
 
         operation = "horizontal concatenatenation"
-        concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
+        concat_df = self.get_operation_stat(
+            operation, self.concat, merged_df, filtered_df
+        )
 
         operation = "fill nulls with 0"
         concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
@@ -185,7 +205,16 @@ class PerformanceTracker(ABC):
 
         perf_df = self.get_stats_df()
 
-        del df, float_cols, filtered_df, grouped_df, merged_df, concat_df, new_df, rand_arr
+        del (
+            df,
+            float_cols,
+            filtered_df,
+            grouped_df,
+            merged_df,
+            concat_df,
+            new_df,
+            rand_arr,
+        )
         gc.collect()
 
         return perf_df
@@ -219,7 +248,9 @@ class PandasBench(PerformanceTracker):
     @profile
     def groupby(self, df, groupby_col, agg_col):
         return df.groupby([groupby_col], as_index=False).agg(
-            agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
         )
 
     @profile
@@ -229,7 +260,9 @@ class PandasBench(PerformanceTracker):
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
         grouped = df.groupby([groupby_col], as_index=False).agg(
-            agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
         )
         return pd.merge(df, grouped, on=[groupby_col], how="left")
 
@@ -292,7 +325,9 @@ class ModinBench(PerformanceTracker):
     @profile
     def groupby(self, df, groupby_col, agg_col):
         return df.groupby([groupby_col], as_index=False).agg(
-            agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
         )
 
     @profile
@@ -302,7 +337,9 @@ class ModinBench(PerformanceTracker):
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
         grouped = df.groupby([groupby_col], as_index=False).agg(
-            agg_mean=(f"{agg_col}", "mean"), agg_sum=(f"{agg_col}", "sum"), agg_std=(f"{agg_col}", "std")
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
         )
         return self.md.merge(df, grouped, on=[groupby_col], how="left")
 
@@ -362,7 +399,10 @@ class PolarsBench(PerformanceTracker):
     @profile
     def get_date_range(self):
         pl_dates = self.pl.date_range(
-            low=datetime(1990, 1, 1), high=datetime(2050, 12, 31), interval="1d", closed="left"
+            low=datetime(1990, 1, 1),
+            high=datetime(2050, 12, 31),
+            interval="1d",
+            closed="left",
         )
         return pl_dates
 
@@ -428,3 +468,7 @@ class PolarsBench(PerformanceTracker):
         logger.critical(f"{self.__class__.__name__}: Importing modules")
         self.pl = __import__("polars")
         return super().run_operations()
+
+
+class DuckdbBench(PerformanceTracker):
+    pass
