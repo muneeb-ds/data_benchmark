@@ -118,7 +118,7 @@ class PerformanceTracker(ABC):
         operation = "add column"
         df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
-        if not df:
+        if df is None:
             # print(df)
             df = self.conn.execute("SELECT * FROM dataframe").df()
 
