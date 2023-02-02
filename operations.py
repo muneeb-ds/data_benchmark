@@ -19,7 +19,7 @@ class PerformanceTracker(ABC):
         self.column_size = args.columns
         self.iters = args.iterations
         self.performance_df = None
-        self.pd = self.md = self.pl = self.ray= None
+        self.pd = self.md = self.pl = self.ray = None
 
     def add(self, stats, operation):
         self.performance_dict[operation] = {}
@@ -34,12 +34,8 @@ class PerformanceTracker(ABC):
         return output
 
     def get_stats_df(self):
-        self.performance_df = pd.DataFrame.from_dict(
-            self.performance_dict, orient="index"
-        )
-        self.performance_df["framework"] = self.__class__.__name__.split("Bench", maxsplit=1)[
-            0
-        ].lower()
+        self.performance_df = pd.DataFrame.from_dict(self.performance_dict, orient="index")
+        self.performance_df["framework"] = self.__class__.__name__.split("Bench", maxsplit=1)[0].lower()
         return self.performance_df
 
     @abstractmethod
@@ -129,11 +125,7 @@ class PerformanceTracker(ABC):
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
 
-        float_cols = [
-            col
-            for col in df.columns
-            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
-        ]
+        float_cols = [col for col in df.columns if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]]
 
         filter_col = np.random.choice(float_cols)
 
@@ -141,34 +133,22 @@ class PerformanceTracker(ABC):
         filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
 
         operation = "filter values based on col mean"
-        filtered_df = self.get_operation_stat(
-            operation, self.filter_vals, df, filter_col, filter_val
-        )
+        filtered_df = self.get_operation_stat(operation, self.filter_vals, df, filter_col, filter_val)
 
-        df_str_cols = [
-            col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]
-        ]
+        df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
         groupby_col = np.random.choice(df_str_cols)
 
         operation = "groupby aggregation (sum, mean, std)"
-        grouped_df = self.get_operation_stat(
-            operation, self.groupby, df, groupby_col, filter_col
-        )
+        grouped_df = self.get_operation_stat(operation, self.groupby, df, groupby_col, filter_col)
 
         operation = "merging grouped col to original df"
-        merged_df = self.get_operation_stat(
-            operation, self.merge, df, grouped_df, groupby_col
-        )
+        merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
 
         operation = "combined groupby merge"
-        merged_df = self.get_operation_stat(
-            operation, self.groupby_merge, df, groupby_col, filter_col
-        )
+        merged_df = self.get_operation_stat(operation, self.groupby_merge, df, groupby_col, filter_col)
 
         operation = "horizontal concatenatenation"
-        concat_df = self.get_operation_stat(
-            operation, self.concat, merged_df, filtered_df
-        )
+        concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
 
         operation = "fill nulls with 0"
         concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
@@ -507,13 +487,13 @@ class DuckdbBench(PerformanceTracker):
         self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
         self.conn.execute("update dataframe set rand_nums = floor(random() * 100 + 1)::int;")
         return None
-    
+
     @profile
     def get_date_range(self):
         query = "SELECT t.day::date FROM generate_series(timestamp '1990-01-01', timestamp '2050-12-31', interval  '1 day') AS t(day);"
         dates = self.conn.execute(query).fetchall()
         return dates
-    
+
     @profile
     def col_mean(self, df, filter_col):
         filter_val = self.conn.execute(f"SELECT AVG({filter_col}) FROM df").fetchall()[0][0]
@@ -526,24 +506,30 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def groupby(self, df, groupby_col, agg_col):
-        self.conn.execute(f"CREATE OR REPLACE TABLE grouped_df AS SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}")
+        self.conn.execute(
+            f"CREATE OR REPLACE TABLE grouped_df AS SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}"
+        )
         return
 
     @profile
     def merge(self, left, right, on):
-        self.conn.execute(f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN grouped_df ON df.{on} = grouped_df.{on}")
+        self.conn.execute(
+            f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN grouped_df ON df.{on} = grouped_df.{on}"
+        )
         return
-    
+
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
-        self.conn.execute(f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}) AS t2 ON df.{groupby_col}=t2.{groupby_col}")
+        self.conn.execute(
+            f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}) AS t2 ON df.{groupby_col}=t2.{groupby_col}"
+        )
         return
 
     @profile
     def concat(self, df_1, df_2):
         df_1 = self.conn.execute("SELECT * FROM filtered_df").df()
         df_2 = self.conn.execute("SELECT * FROM merged_df").df()
-        concat_df = pd.concat([df_1, df_2], axis =0)
+        concat_df = pd.concat([df_1, df_2], axis=0)
         self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM concat_df")
         return
 
@@ -580,16 +566,16 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def read_parquet(self, path):
         self.conn.execute(f"CREATE OR REPLACE TABLE parquet_df AS SELECT * FROM read_parquet({path})")
-    
+
     @profile
     def create_df(self, df_dict):
         df = pd.DataFrame.from_dict(df_dict)
         self.conn.execute("CREATE OR REPLACE TABLE created_df AS SELECT * FROM df")
-    
+
     def run_operations(self):
         logger.critical("%s: Importing modules", self.__class__.__name__)
-        self.duckdb = __import__('duckdb')
-        self.pl = __import__('polars')
-        self.pq = __import__('pyarrow.parquet', fromlist="parquet")
+        self.duckdb = __import__("duckdb")
+        self.pl = __import__("polars")
+        self.pq = __import__("pyarrow.parquet", fromlist="parquet")
         self.conn = self.duckdb.connect(":memory:")
         return super().run_operations()

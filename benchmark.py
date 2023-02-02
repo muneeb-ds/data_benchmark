@@ -25,7 +25,9 @@ if __name__ == "__main__":
         df_stats = [framework.run_operations() for framework in frameworks]
         df_perf_stats = pd.concat(df_stats, axis=0)
         performance_df = df_perf_stats.reset_index(names="operation")
-        performance_df = pd.melt(performance_df, id_vars=["operation", "framework"], var_name="stat", value_name="values")
+        performance_df = pd.melt(
+            performance_df, id_vars=["operation", "framework"], var_name="stat", value_name="values"
+        )
         performance_df["iteration"] = iter
         perf_df = pd.concat([perf_df, performance_df], axis=0)
         del df_stats

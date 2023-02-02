@@ -30,7 +30,7 @@ def argument_parser():
         default=["pandas", "modin", "polars"],
         nargs="*",
         help="frameworks to benchmark on (pandas, modin, polars, duckdb supported)",
-        choices=["pandas", "modin", "polars","duckdb"],
+        choices=["pandas", "modin", "polars", "duckdb"],
     )
     args = parser.parse_args()
 
@@ -53,7 +53,7 @@ def profile(func):
         result = func(*args, **kwargs)
         # mem_after, result = memory_usage((func, args, kwargs), retval=True, max_usage=True)
         mem_after = get_mem_usage()
-        mem_after = round(mem_after-mem_before, 2)
+        mem_after = round(mem_after - mem_before, 2)
         elapsed_time = round(elapsed_since(start), 4)
         return result, (mem_after, elapsed_time)
 
