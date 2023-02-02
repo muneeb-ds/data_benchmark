@@ -109,7 +109,7 @@ class PerformanceTracker(ABC):
         operation = "reading csv"
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
-        if not df:
+        if df is None:
             # print(df)
             df = self.conn.execute("SELECT * FROM dataframe").df()
 
