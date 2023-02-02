@@ -2,11 +2,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 import gc
 import time
+import logging
 import numpy as np
 import pandas as pd
-import logging
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 from utils import profile, create_dataframe_dict, remove_parquets
 
@@ -20,6 +18,8 @@ class PerformanceTracker(ABC):
         self.row_size = args.rows
         self.column_size = args.columns
         self.iters = args.iterations
+        self.performance_df = None
+        self.pd = self.md = self.pl = self.ray= None
 
     def add(self, stats, operation):
         self.performance_dict[operation] = {}
@@ -28,7 +28,7 @@ class PerformanceTracker(ABC):
         return self
 
     def get_operation_stat(self, operation, func, *args):
-        logger.critical(f"{self.__class__.__name__}: {operation}")
+        logger.critical("%s: %s", self.__class__.__name__, operation)
         output, stats = func(*args)
         self.add(stats, operation)
         return output
@@ -37,7 +37,7 @@ class PerformanceTracker(ABC):
         self.performance_df = pd.DataFrame.from_dict(
             self.performance_dict, orient="index"
         )
-        self.performance_df["framework"] = self.__class__.__name__.split("Bench")[
+        self.performance_df["framework"] = self.__class__.__name__.split("Bench", maxsplit=1)[
             0
         ].lower()
         return self.performance_df
@@ -108,15 +108,23 @@ class PerformanceTracker(ABC):
         pass
 
     def run_operations(self):
-        t0 = time.perf_counter()
+        time_0 = time.perf_counter()
 
-        operation = f"reading csv"
+        operation = "reading csv"
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
+
+        if not df:
+            # print(df)
+            df = self.conn.execute("SELECT * FROM dataframe").df()
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
 
         operation = "add column"
         df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
+
+        if not df:
+            # print(df)
+            df = self.conn.execute("SELECT * FROM dataframe").df()
 
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
@@ -195,13 +203,13 @@ class PerformanceTracker(ABC):
         operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
         new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
-        t_final = time.perf_counter() - t0
+        t_final = time.perf_counter() - time_0
 
         operation = "Total stats"
-        logger.critical(f"{self.__class__.__name__}: {operation}")
+        logger.critical("%s: %s", self.__class__.__name__, operation)
         self.add((np.NaN, t_final), operation)
 
-        logger.critical(f"{self.__class__.__name__}: combining stats")
+        logger.critical("%s : combining stats", self.__class__.__name__)
 
         perf_df = self.get_stats_df()
 
@@ -221,6 +229,10 @@ class PerformanceTracker(ABC):
 
 
 class PandasBench(PerformanceTracker):
+    def __init__(self, args) -> None:
+        super().__init__(args)
+        self.pd = None
+
     @profile
     def read_csv(self, path):
         df = self.pd.read_csv(path)
@@ -292,12 +304,16 @@ class PandasBench(PerformanceTracker):
         df.to_parquet("sample_data.parquet", index=False, engine="pyarrow")
 
     def run_operations(self):
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        logger.critical("%s: Importing modules", self.__class__.__name__)
         self.pd = __import__("pandas")
         return super().run_operations()
 
 
 class ModinBench(PerformanceTracker):
+    def __init__(self, args) -> None:
+        super().__init__(args)
+        self.md = self.ray = None
+
     @profile
     def read_csv(self, path):
         df = self.md.read_csv(path)
@@ -368,7 +384,7 @@ class ModinBench(PerformanceTracker):
         df.to_parquet("sample_data.parquet", index=False, engine="pyarrow")
 
     def run_operations(self):
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        logger.critical("%s: Importing modules", self.__class__.__name__)
         self.md = __import__("modin.pandas", fromlist=["pandas"])
         self.ray = __import__("ray")
         self.ray.init(
@@ -381,6 +397,10 @@ class ModinBench(PerformanceTracker):
 
 
 class PolarsBench(PerformanceTracker):
+    def __init__(self, args) -> None:
+        super().__init__(args)
+        self.pl = None
+
     @profile
     def read_csv(self, path):
         df = self.pl.read_csv(path)
@@ -465,10 +485,111 @@ class PolarsBench(PerformanceTracker):
         df.write_parquet("sample_data.parquet")
 
     def run_operations(self):
-        logger.critical(f"{self.__class__.__name__}: Importing modules")
+        logger.critical("%s: Importing modules", self.__class__.__name__)
         self.pl = __import__("polars")
         return super().run_operations()
 
 
 class DuckdbBench(PerformanceTracker):
-    pass
+    def __init__(self, args) -> None:
+        super().__init__(args)
+        self.duckdb = self.conn = None
+
+    @profile
+    def read_csv(self, path):
+        query = f"CREATE OR REPLACE TABLE dataframe AS SELECT * FROM read_csv_auto ('{path}')"
+        self.conn.execute(query)
+        return None
+
+    @profile
+    def add_column(self, df, array):
+        print(self.conn.execute("SELECT * FROM dataframe").df())
+        self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
+        self.conn.execute("update dataframe set rand_nums = floor(random() * 100 + 1)::int;")
+        return None
+    
+    @profile
+    def get_date_range(self):
+        query = "SELECT t.day::date FROM generate_series(timestamp '1990-01-01', timestamp '2050-12-31', interval  '1 day') AS t(day);"
+        dates = self.conn.execute(query).fetchall()
+        return dates
+    
+    @profile
+    def col_mean(self, df, filter_col):
+        filter_val = self.conn.execute(f"SELECT AVG({filter_col}) FROM df").fetchall()[0][0]
+        return filter_val
+
+    @profile
+    def filter_vals(self, df, filter_col, filter_val):
+        self.conn.execute(f"CREATE OR REPLACE TABLE filtered_df AS SELECT * FROM df WHERE {filter_col} > {filter_val}")
+        return None
+
+    @profile
+    def groupby(self, df, groupby_col, agg_col):
+        self.conn.execute(f"CREATE OR REPLACE TABLE grouped_df AS SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}")
+        return
+
+    @profile
+    def merge(self, left, right, on):
+        self.conn.execute(f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN grouped_df ON df.{on} = grouped_df.{on}")
+        return
+    
+    @profile
+    def groupby_merge(self, df, groupby_col, agg_col):
+        self.conn.execute(f"CREATE OR REPLACE TABLE merged_df AS SELECT * FROM df LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}) AS t2 ON df.{groupby_col}=t2.{groupby_col}")
+        return
+
+    @profile
+    def concat(self, df_1, df_2):
+        df_1 = self.conn.execute("SELECT * FROM filtered_df").df()
+        df_2 = self.conn.execute("SELECT * FROM merged_df").df()
+        concat_df = pd.concat([df_1, df_2], axis =0)
+        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM concat_df")
+        return
+
+    @profile
+    def fill_na(self, df):
+        df = self.conn.execute("SELECT * FROM concat_table").df()
+        filled_df = df.fillna(0)
+        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM filled_df")
+        return
+
+    @profile
+    def drop_na(self, df):
+        df = self.conn.execute("SELECT * FROM concat_table").df()
+        df = df.dropna()
+        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM df")
+        return
+
+    @profile
+    def describe_df(self, df):
+        df = self.conn.execute("SELECT * FROM concat_table").df()
+        return super().describe_df(df)
+
+    @profile
+    def save_to_csv(self, df):
+        df = self.conn.execute("SELECT * FROM concat_table").arrow()
+        pl_df = self.pl.DataFrame(df)
+        pl_df.write_csv("sample_data.csv")
+
+    @profile
+    def save_to_parquet(self, df):
+        df = self.conn.execute("SELECT * FROM concat_table").arrow()
+        self.pq.write_table(df, "sample_data.parquet")
+
+    @profile
+    def read_parquet(self, path):
+        self.conn.execute(f"CREATE OR REPLACE TABLE parquet_df AS SELECT * FROM read_parquet({path})")
+    
+    @profile
+    def create_df(self, df_dict):
+        df = pd.DataFrame.from_dict(df_dict)
+        self.conn.execute("CREATE OR REPLACE TABLE created_df AS SELECT * FROM df")
+    
+    def run_operations(self):
+        logger.critical("%s: Importing modules", self.__class__.__name__)
+        self.duckdb = __import__('duckdb')
+        self.pl = __import__('polars')
+        self.pq = __import__('pyarrow.parquet', fromlist="parquet")
+        self.conn = self.duckdb.connect(":memory:")
+        return super().run_operations()
