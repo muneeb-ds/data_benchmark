@@ -546,12 +546,7 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def concat(self, df_1, df_2):
-        df_1 = self.conn.execute("SELECT * FROM filtered_df").df()
-        df_2 = self.conn.execute("SELECT * FROM merged_df").df()
-        del df_1, df_2
-        gc.collect()
-        concat_df = pd.concat([df_1, df_2], axis=0)
-        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM concat_df")
+        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM merged_df UNION ALL SELECT * FROM merged_df")
         return
 
     @profile
