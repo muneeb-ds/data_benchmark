@@ -21,7 +21,7 @@ if __name__ == "__main__":
     logger.critical("Starting Benchmarking...")
 
     for i in range(ITERS):
-        logger.critical("Running iteration: %s",i+1)
+        logger.critical("Running iteration: %s", i + 1)
         df_stats = [framework.run() for framework in frameworks]
         df_perf_stats = pd.concat(df_stats, axis=0)
         performance_df = df_perf_stats.reset_index(names="operation")

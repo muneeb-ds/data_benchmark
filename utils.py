@@ -11,7 +11,9 @@ import numpy as np
 def argument_parser():
     parser = argparse.ArgumentParser(description="benchmark arguments")
     parser.add_argument("--data_path", required=True, help="path where csv to be read is saved")
-    parser.add_argument("--rows", type=int, default=1000, help="number of rows of created dataframe")
+    parser.add_argument(
+        "--rows", type=int, default=1000, help="number of rows of created dataframe"
+    )
     parser.add_argument(
         "--columns",
         type=int,
@@ -86,7 +88,9 @@ def remove_parquets(path):
 
 
 def format_perf_df(perf_df):
-    perf_df_mean = perf_df.groupby(["operation", "framework", "stat"], as_index=False)["values"].mean()
+    perf_df_mean = perf_df.groupby(["operation", "framework", "stat"], as_index=False)[
+        "values"
+    ].mean()
     perf_df_mean["mean_stats"] = np.round(perf_df_mean["values"], 4)
     perf_df_mean.drop(columns=["values"], inplace=True)
 

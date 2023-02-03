@@ -36,7 +36,9 @@ class PerformanceTracker(ABC):
 
     def get_stats_df(self):
         self.performance_df = pd.DataFrame.from_dict(self.performance_dict, orient="index")
-        self.performance_df["framework"] = self.__class__.__name__.split("Bench", maxsplit=1)[0].lower()
+        self.performance_df["framework"] = self.__class__.__name__.split("Bench", maxsplit=1)[
+            0
+        ].lower()
         return self.performance_df
 
     @abstractmethod
@@ -130,7 +132,11 @@ class PerformanceTracker(ABC):
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
 
-        float_cols = [col for col in df.columns if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]]
+        float_cols = [
+            col
+            for col in df.columns
+            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
+        ]
 
         filter_col = np.random.choice(float_cols)
 
@@ -138,7 +144,9 @@ class PerformanceTracker(ABC):
         filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
 
         operation = "filter values based on col mean"
-        filtered_df = self.get_operation_stat(operation, self.filter_vals, df, filter_col, filter_val)
+        filtered_df = self.get_operation_stat(
+            operation, self.filter_vals, df, filter_col, filter_val
+        )
 
         df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
         groupby_col = np.random.choice(df_str_cols)
@@ -150,7 +158,9 @@ class PerformanceTracker(ABC):
         merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
 
         operation = "combined groupby merge"
-        merged_df = self.get_operation_stat(operation, self.groupby_merge, df, groupby_col, filter_col)
+        merged_df = self.get_operation_stat(
+            operation, self.groupby_merge, df, groupby_col, filter_col
+        )
 
         operation = "horizontal concatenatenation"
         concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
@@ -203,7 +213,6 @@ class PerformanceTracker(ABC):
         gc.collect()
 
         return t_final
-
 
     def run(self):
         time_0 = time.perf_counter()
@@ -512,7 +521,9 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def filter_vals(self, df, filter_col, filter_val):
-        self.conn.execute(f"CREATE OR REPLACE TABLE filtered_df AS SELECT * FROM df WHERE {filter_col} > {filter_val}")
+        self.conn.execute(
+            f"CREATE OR REPLACE TABLE filtered_df AS SELECT * FROM df WHERE {filter_col} > {filter_val}"
+        )
         return None
 
     @profile
@@ -576,7 +587,9 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def read_parquet(self, path):
-        self.conn.execute(f"CREATE OR REPLACE TABLE parquet_df AS SELECT * FROM read_parquet({path})")
+        self.conn.execute(
+            f"CREATE OR REPLACE TABLE parquet_df AS SELECT * FROM read_parquet({path})"
+        )
 
     @profile
     def create_df(self, df_dict):
@@ -587,7 +600,7 @@ class DuckdbBench(PerformanceTracker):
     def convert_to_pandas(self):
         df = self.conn.execute("SELECT * FROM dataframe").df()
         return df
-   
+
     @profile
     def convert_to_numpy(self):
         df = self.conn.execute("SELECT * FROM dataframe").fetchnumpy()
