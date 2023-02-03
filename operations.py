@@ -20,6 +20,7 @@ class PerformanceTracker(ABC):
         self.iters = args.iterations
         self.performance_df = None
         self.pd = self.md = self.pl = self.ray = None
+        self.conn = None
 
     def add(self, stats, operation):
         self.performance_dict[operation] = {}
@@ -103,9 +104,13 @@ class PerformanceTracker(ABC):
     def save_to_parquet(self, df):
         pass
 
-    def run_operations(self):
-        time_0 = time.perf_counter()
+    def log_total_time(self, start, end):
+        t_final = end - start
+        operation = "Total time"
+        logger.critical("%s: %s", self.__class__.__name__, operation)
+        self.add((np.NaN, t_final), operation)
 
+    def run_operations(self):
         operation = "reading csv"
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
@@ -183,15 +188,7 @@ class PerformanceTracker(ABC):
         operation = f"create dataframe of size: ({self.row_size},{self.column_size})"
         new_df = self.get_operation_stat(operation, self.create_df, df_dict)
 
-        t_final = time.perf_counter() - time_0
-
-        operation = "Total stats"
-        logger.critical("%s: %s", self.__class__.__name__, operation)
-        self.add((np.NaN, t_final), operation)
-
-        logger.critical("%s : combining stats", self.__class__.__name__)
-
-        perf_df = self.get_stats_df()
+        t_final = time.perf_counter()
 
         del (
             df,
@@ -204,6 +201,19 @@ class PerformanceTracker(ABC):
             rand_arr,
         )
         gc.collect()
+
+        return t_final
+
+
+    def run(self):
+        time_0 = time.perf_counter()
+        t_final = self.run_operations()
+
+        self.log_total_time(time_0, t_final)
+
+        logger.critical("%s : combining stats", self.__class__.__name__)
+
+        perf_df = self.get_stats_df()
 
         return perf_df
 
@@ -474,6 +484,7 @@ class DuckdbBench(PerformanceTracker):
     def __init__(self, args) -> None:
         super().__init__(args)
         self.duckdb = self.conn = None
+        self.pq = None
 
     @profile
     def read_csv(self, path):
@@ -572,10 +583,38 @@ class DuckdbBench(PerformanceTracker):
         df = pd.DataFrame.from_dict(df_dict)
         self.conn.execute("CREATE OR REPLACE TABLE created_df AS SELECT * FROM df")
 
+    @profile
+    def convert_to_pandas(self):
+        df = self.conn.execute("SELECT * FROM dataframe").df()
+        return df
+   
+    @profile
+    def convert_to_numpy(self):
+        df = self.conn.execute("SELECT * FROM dataframe").fetchnumpy()
+        return df
+
+    @profile
+    def convert_to_arrow(self):
+        df = self.conn.execute("SELECT * FROM dataframe").arrow()
+        return df
+
     def run_operations(self):
         logger.critical("%s: Importing modules", self.__class__.__name__)
         self.duckdb = __import__("duckdb")
         self.pl = __import__("polars")
         self.pq = __import__("pyarrow.parquet", fromlist="parquet")
         self.conn = self.duckdb.connect(":memory:")
-        return super().run_operations()
+
+        t_mid = super().run_operations()
+
+        operation = "converting to pandas"
+        _ = self.get_operation_stat(operation, self.convert_to_pandas)
+
+        operation = "converting to numpy"
+        _ = self.get_operation_stat(operation, self.convert_to_numpy)
+
+        operation = "converting to arrow"
+        _ = self.get_operation_stat(operation, self.convert_to_arrow)
+
+        t_final = time.perf_counter() + t_mid
+        return t_final

@@ -1,7 +1,7 @@
 import gc
-import pandas as pd
-import os
 import logging
+import os
+import pandas as pd
 
 from operations import PerformanceTracker
 from utils import argument_parser, format_perf_df
@@ -20,15 +20,15 @@ if __name__ == "__main__":
     ]
     logger.critical("Starting Benchmarking...")
 
-    for iter in range(ITERS):
-        logger.critical(f"Running iteration: {iter+1}")
-        df_stats = [framework.run_operations() for framework in frameworks]
+    for i in range(ITERS):
+        logger.critical("Running iteration: %s",i+1)
+        df_stats = [framework.run() for framework in frameworks]
         df_perf_stats = pd.concat(df_stats, axis=0)
         performance_df = df_perf_stats.reset_index(names="operation")
         performance_df = pd.melt(
             performance_df, id_vars=["operation", "framework"], var_name="stat", value_name="values"
         )
-        performance_df["iteration"] = iter
+        performance_df["iteration"] = i
         perf_df = pd.concat([perf_df, performance_df], axis=0)
         del df_stats
         gc.collect()
