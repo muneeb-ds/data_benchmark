@@ -108,7 +108,7 @@ class PerformanceTracker(ABC):
 
     def log_total_time(self, start, end):
         t_final = end - start
-        operation = "Total time"
+        operation = "log total time"
         logger.critical("%s: %s", self.__class__.__name__, operation)
         self.add((np.NaN, t_final), operation)
 
@@ -117,7 +117,6 @@ class PerformanceTracker(ABC):
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
         if df is None:
-            # print(df)
             df = self.conn.execute("SELECT * FROM dataframe").df()
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
@@ -126,7 +125,6 @@ class PerformanceTracker(ABC):
         df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
         if df is None:
-            # print(df)
             df = self.conn.execute("SELECT * FROM dataframe").df()
 
         operation = "get date range"
@@ -220,7 +218,7 @@ class PerformanceTracker(ABC):
 
         self.log_total_time(time_0, t_final)
 
-        logger.critical("%s : combining stats", self.__class__.__name__)
+        logger.critical("%s: combining stats", self.__class__.__name__)
 
         perf_df = self.get_stats_df()
 
@@ -503,7 +501,6 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def add_column(self, df, array):
-        print(self.conn.execute("SELECT * FROM dataframe").df())
         self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
         self.conn.execute("update dataframe set rand_nums = floor(random() * 100 + 1)::int;")
         return None
