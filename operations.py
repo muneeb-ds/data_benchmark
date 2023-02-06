@@ -116,54 +116,53 @@ class PerformanceTracker(ABC):
         operation = "reading csv"
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
-        # if df is None:
-        #     df = self.conn.execute("SELECT * FROM dataframe").df()
+        if df is None:
+            df = self.conn.execute("SELECT * FROM dataframe").df()
 
-        # rand_arr = np.random.randint(0, 100, df.shape[0])
+        rand_arr = np.random.randint(0, 100, df.shape[0])
 
         # operation = "add column"
         # df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
-        # if df is None:
-        #     df = self.conn.execute("SELECT * FROM dataframe").df()
+        if df is None:
+            df = self.conn.execute("SELECT * FROM dataframe").df()
 
-        # operation = "get date range"
-        # _ = self.get_operation_stat(operation, self.get_date_range)
+        operation = "get date range"
+        _ = self.get_operation_stat(operation, self.get_date_range)
 
-        # float_cols = [
-        #     col
-        #     for col in df.columns
-        #     if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
-        # ]
+        float_cols = [
+            col
+            for col in df.columns
+            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
+        ]
 
-        # filter_col = np.random.choice(float_cols)
+        filter_col = np.random.choice(float_cols)
 
-        # operation = "get column mean val"
-        # filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
+        operation = "get column mean val"
+        filter_val = self.get_operation_stat(operation, self.col_mean, df, filter_col)
 
-        # operation = "filter values based on col mean"
-        # filtered_df = self.get_operation_stat(
-        #     operation, self.filter_vals, df, filter_col, filter_val
-        # )
+        operation = "filter values based on col mean"
+        filtered_df = self.get_operation_stat(
+            operation, self.filter_vals, df, filter_col, filter_val
+        )
 
-        # df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
-        # groupby_col = np.random.choice(df_str_cols)
+        df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
+        groupby_col = np.random.choice(df_str_cols)
 
-        # operation = "groupby aggregation (sum, mean, std)"
-        # grouped_df = self.get_operation_stat(operation, self.groupby, df, groupby_col, filter_col)
+        operation = "groupby aggregation (sum, mean, std)"
+        grouped_df = self.get_operation_stat(operation, self.groupby, df, groupby_col, filter_col)
 
-        # operation = "merging grouped col to original df"
-        # merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
+        operation = "merging grouped col to original df"
+        merged_df = self.get_operation_stat(operation, self.merge, df, grouped_df, groupby_col)
 
-        # operation = "combined groupby merge"
-        # merged_df = self.get_operation_stat(
-        #     operation, self.groupby_merge, df, groupby_col, filter_col
-        # )
-        merged_df = filtered_df = None
+        operation = "combined groupby merge"
+        merged_df = self.get_operation_stat(
+            operation, self.groupby_merge, df, groupby_col, filter_col
+        )
+
         operation = "horizontal concatenatenation"
         concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
         exit()
-
         operation = "fill nulls with 0"
         concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
 
@@ -496,52 +495,52 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def read_csv(self, path):
-        query = f"CREATE OR REPLACE TABLE dataframe AS SELECT * FROM read_csv_auto ('{path}')"
+        query = f"CREATE OR REPLACE TABLE dataframe AS SELECT *, floor(random() * 100 + 1)::int AS rand_nums FROM read_csv_auto ('{path}')"
         self.conn.execute(query)
         return None
 
     @profile
     def add_column(self, df, array):
-        self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
-        self.conn.execute("update dataframe set rand_nums = floor(random() * 100 + 1)::int;")
+        # self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
+        self.conn.execute("SELECT *, rand_nums AS floor(random() * 100 + 1)::int FROM dataframe")
         return None
 
     @profile
     def get_date_range(self):
         query = "SELECT t.day::date FROM generate_series(timestamp '1990-01-01', timestamp '2050-12-31', interval  '1 day') AS t(day);"
-        dates = self.conn.execute(query).fetchall()
+        dates = self.conn.execute(query).fetchnumpy()
         return dates
 
     @profile
     def col_mean(self, df, filter_col):
-        filter_val = self.conn.execute(f"SELECT AVG({filter_col}) FROM df").fetchall()[0][0]
+        filter_val = self.conn.execute(f"SELECT AVG({filter_col}) FROM dataframe").fetchall()[0][0]
         return filter_val
 
     @profile
     def filter_vals(self, df, filter_col, filter_val):
         self.conn.execute(
-            f"CREATE OR REPLACE VIEW filtered_df AS SELECT * FROM df WHERE {filter_col} > {filter_val}"
+            f"CREATE OR REPLACE VIEW filtered_df AS SELECT * FROM dataframe WHERE {filter_col} > {filter_val}"
         )
         return None
 
     @profile
     def groupby(self, df, groupby_col, agg_col):
         self.conn.execute(
-            f"CREATE OR REPLACE VIEW grouped_df AS SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}"
+            f"CREATE OR REPLACE VIEW grouped_df AS SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM dataframe GROUP BY {groupby_col}"
         )
         return
 
     @profile
     def merge(self, left, right, on):
         self.conn.execute(
-            f"CREATE OR REPLACE VIEW merged_df AS SELECT * FROM df LEFT JOIN grouped_df ON df.{on} = grouped_df.{on}"
+            f"CREATE OR REPLACE VIEW merged_df AS SELECT * FROM dataframe LEFT JOIN grouped_df ON dataframe.{on} = grouped_df.{on}"
         )
         return
 
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
         self.conn.execute(
-            f"CREATE OR REPLACE VIEW merged_df AS SELECT * FROM df LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM df GROUP BY {groupby_col}) AS t2 ON df.{groupby_col}=t2.{groupby_col}"
+            f"CREATE OR REPLACE VIEW merged_df AS SELECT * FROM dataframe LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM dataframe GROUP BY {groupby_col}) AS t2 ON dataframe.{groupby_col}=t2.{groupby_col}"
         )
         return
 
@@ -554,14 +553,14 @@ class DuckdbBench(PerformanceTracker):
     def fill_na(self, df):
         df = self.conn.execute("SELECT * FROM concat_table").df()
         filled_df = df.fillna(0)
-        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM filled_df")
+        self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM filled_df")
         return
 
     @profile
     def drop_na(self, df):
         df = self.conn.execute("SELECT * FROM concat_table").df()
         df = df.dropna()
-        self.conn.execute("CREATE OR REPLACE TABLE concat_table AS SELECT * FROM df")
+        self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM dataframe")
         return
 
     @profile
@@ -583,13 +582,13 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def read_parquet(self, path):
         self.conn.execute(
-            f"CREATE OR REPLACE TABLE parquet_df AS SELECT * FROM read_parquet({path})"
+            f"CREATE OR REPLACE VIEW parquet_df AS SELECT * FROM read_parquet({path})"
         )
 
     @profile
     def create_df(self, df_dict):
         df = pd.DataFrame.from_dict(df_dict)
-        self.conn.execute("CREATE OR REPLACE TABLE created_df AS SELECT * FROM df")
+        self.conn.execute("CREATE OR REPLACE VIEW created_df AS SELECT * FROM dataframe")
 
     @profile
     def convert_to_pandas(self):
