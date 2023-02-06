@@ -654,13 +654,17 @@ class DuckdbBench(PerformanceTracker):
         t_mid = super().run_operations()
 
         operation = "converting to pandas"
-        _ = self.get_operation_stat(operation, self.convert_to_pandas)
+        pd_df = self.get_operation_stat(operation, self.convert_to_pandas)
+        del pd_df
 
         operation = "converting to numpy"
-        _ = self.get_operation_stat(operation, self.convert_to_numpy)
+        np_df = self.get_operation_stat(operation, self.convert_to_numpy)
+        del np_df
 
         operation = "converting to arrow"
-        _ = self.get_operation_stat(operation, self.convert_to_arrow)
+        arrow_df = self.get_operation_stat(operation, self.convert_to_arrow)
+        del arrow_df
 
         t_final = time.perf_counter() + t_mid
+        gc.collect()
         return t_final
