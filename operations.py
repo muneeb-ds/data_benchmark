@@ -504,7 +504,7 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def add_column(self, df, array):
         self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
-        self.conn.execute("SELECT *, rand_nums AS floor(random() * 100 + 1)::int FROM dataframe")
+        self.conn.execute("UPDATE SET rand_nums AS floor(random() * 100 + 1)::int FROM dataframe")
         return None
 
     @profile
