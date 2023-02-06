@@ -125,10 +125,6 @@ class PerformanceTracker(ABC):
         operation = "add column"
         _ = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
-        # if df is None:
-        #     print("CONVERTING to pandas df")
-        #     df = self.conn.execute("SELECT * FROM dataframe").df()
-
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
 
@@ -164,7 +160,7 @@ class PerformanceTracker(ABC):
 
         operation = "horizontal concatenatenation"
         concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
-        
+
         operation = "fill nulls with 0"
         concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
 
@@ -541,34 +537,46 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
+        og_cols = self.conn.execute("DESCRIBE TABLE dataframe").fetchnumpy()['column_name']
+        og_cols = [f"t1.{col}" for col in og_cols]
+        og_cols = ", ".join(og_cols)
         self.conn.execute(
-            f"CREATE OR REPLACE VIEW merged_df AS SELECT * FROM dataframe LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM dataframe GROUP BY {groupby_col}) AS t2 ON dataframe.{groupby_col}=t2.{groupby_col}"
+            f"CREATE OR REPLACE VIEW merged_df AS SELECT {og_cols}, {agg_col}_sum, {agg_col}_avg, {agg_col}_std FROM dataframe AS t1 LEFT JOIN (SELECT {groupby_col}, SUM({agg_col}) AS {agg_col}_sum, AVG({agg_col}) AS {agg_col}_avg, STDDEV({agg_col}) AS {agg_col}_std FROM dataframe GROUP BY {groupby_col}) AS t2 ON t1.{groupby_col}=t2.{groupby_col}"
         )
         return
 
     @profile
     def concat(self, df_1, df_2):
         self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM merged_df UNION ALL SELECT * FROM merged_df")
+        print(self.conn.execute("SELECT * FROM concat_table").df().columns)
         return
 
     @profile
     def fill_na(self, df):
-        df = self.conn.execute("SELECT * FROM concat_table").df()
-        filled_df = df.fillna(0)
-        self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM filled_df")
+        df_cols = self.conn.execute("DESCRIBE TABLE concat_table").fetchnumpy()['column_name']
+        query = "CREATE OR REPLACE VIEW concat_table_filled_nulls AS SELECT"
+        for col in df_cols:
+            query += f" COALESCE({col}, 0) AS {col},"
+        query += " FROM concat_table"
+        df = self.conn.execute(query)
         return
 
     @profile
     def drop_na(self, df):
-        df = self.conn.execute("SELECT * FROM concat_table").df()
-        df = df.dropna()
-        self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM dataframe")
+        df_cols = self.conn.execute("DESCRIBE TABLE concat_table").fetchnumpy()['column_name']
+        query = "CREATE OR REPLACE VIEW concat_table_dropped_nulls AS SELECT * FROM concat_table WHERE"
+        for i, col in enumerate(df_cols):
+            query += f" {col} IS NOT NULL"
+            if i+1 != len(df_cols):
+                query += f" AND"
+        self.conn.execute(query)
         return
 
     @profile
     def describe_df(self, df):
-        df = self.conn.execute("SELECT * FROM concat_table").df()
-        return super().describe_df(df)
+        described = self.conn.execute("SUMMARIZE concat_table").df()
+        print(described)
+        return
 
     @profile
     def save_to_csv(self, df):
