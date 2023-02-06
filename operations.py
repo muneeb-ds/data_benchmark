@@ -164,7 +164,7 @@ class PerformanceTracker(ABC):
 
         operation = "horizontal concatenatenation"
         concat_df = self.get_operation_stat(operation, self.concat, merged_df, filtered_df)
-        exit()
+        
         operation = "fill nulls with 0"
         concat_df = self.get_operation_stat(operation, self.fill_na, concat_df)
 
