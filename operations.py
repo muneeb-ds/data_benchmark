@@ -117,6 +117,7 @@ class PerformanceTracker(ABC):
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
         if df is None:
+            print("CONVERTING to pandas df")
             df = self.conn.execute("SELECT * FROM dataframe").df()
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
@@ -124,8 +125,9 @@ class PerformanceTracker(ABC):
         # operation = "add column"
         # df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
-        if df is None:
-            df = self.conn.execute("SELECT * FROM dataframe").df()
+        # if df is None:
+        #     print("CONVERTING to pandas df")
+        #     df = self.conn.execute("SELECT * FROM dataframe").df()
 
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
