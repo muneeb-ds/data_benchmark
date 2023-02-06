@@ -57,6 +57,7 @@ def profile(func):
         mem_after = get_mem_usage()
         mem_after = round(mem_after - mem_before, 2)
         elapsed_time = round(elapsed_since(start), 4)
+        print(mem_after)
         return result, (mem_after, elapsed_time)
 
     return wrapper
