@@ -578,14 +578,11 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def save_to_csv(self, df):
-        df = self.conn.execute("SELECT * FROM concat_table").arrow()
-        pl_df = self.pl.DataFrame(df)
-        pl_df.write_csv("sample_data.csv")
+        self.conn.execute("COPY concat_table TO 'sample_data_duck.csv' (HEADER, DELIMETER ',')")
 
     @profile
     def save_to_parquet(self, df):
-        df = self.conn.execute("SELECT * FROM concat_table").arrow()
-        self.pq.write_table(df, "sample_data.parquet")
+        self.conn.execute("COPY concat_table TO 'sample_data.parquet' (FORMAT PARQUET)")
 
     @profile
     def read_parquet(self, path):
@@ -595,8 +592,8 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def create_df(self, df_dict):
-        df = pd.DataFrame.from_dict(df_dict)
-        self.conn.execute("CREATE OR REPLACE VIEW created_df AS SELECT * FROM dataframe")
+        df_from_dict = pd.DataFrame.from_dict(df_dict)
+        self.conn.execute("CREATE OR REPLACE VIEW created_df AS SELECT * FROM df_from_dict")
 
     @profile
     def convert_to_pandas(self):
