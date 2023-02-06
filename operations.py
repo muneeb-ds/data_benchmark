@@ -548,7 +548,6 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def concat(self, df_1, df_2):
         self.conn.execute("CREATE OR REPLACE VIEW concat_table AS SELECT * FROM merged_df UNION ALL SELECT * FROM merged_df")
-        print(self.conn.execute("SELECT * FROM concat_table").df().columns)
         return
 
     @profile
@@ -575,7 +574,6 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def describe_df(self, df):
         described = self.conn.execute("SUMMARIZE concat_table").df()
-        print(described)
         return
 
     @profile
