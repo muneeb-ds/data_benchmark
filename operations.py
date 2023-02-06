@@ -123,7 +123,7 @@ class PerformanceTracker(ABC):
         rand_arr = np.random.randint(0, 100, df.shape[0])
 
         operation = "add column"
-        df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
+        _ = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
         # if df is None:
         #     print("CONVERTING to pandas df")
