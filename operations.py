@@ -122,8 +122,8 @@ class PerformanceTracker(ABC):
 
         rand_arr = np.random.randint(0, 100, df.shape[0])
 
-        # operation = "add column"
-        # df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
+        operation = "add column"
+        df = self.get_operation_stat(operation, self.add_column, df, rand_arr)
 
         # if df is None:
         #     print("CONVERTING to pandas df")
@@ -497,13 +497,13 @@ class DuckdbBench(PerformanceTracker):
 
     @profile
     def read_csv(self, path):
-        query = f"CREATE OR REPLACE TABLE dataframe AS SELECT *, floor(random() * 100 + 1)::int AS rand_nums FROM read_csv_auto ('{path}')"
+        query = f"CREATE OR REPLACE TABLE dataframe AS SELECT * FROM read_csv_auto ('{path}')"
         self.conn.execute(query)
         return None
 
     @profile
     def add_column(self, df, array):
-        # self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
+        self.conn.execute("ALTER TABLE dataframe ADD COLUMN rand_nums INTEGER")
         self.conn.execute("SELECT *, rand_nums AS floor(random() * 100 + 1)::int FROM dataframe")
         return None
 
