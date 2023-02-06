@@ -45,6 +45,10 @@ class PerformanceTracker(ABC):
     def read_csv(self, path):
         pass
 
+    @profile
+    def get_shape(self, df):
+        return df.shape
+
     @abstractmethod
     def read_parquet(self, path):
         pass
@@ -56,6 +60,20 @@ class PerformanceTracker(ABC):
     @abstractmethod
     def get_date_range(self):
         pass
+
+    @profile
+    def get_float_cols(self, df):
+        float_cols = [
+            col
+            for col in df.columns
+            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
+        ]
+
+        return float_cols
+    
+    @profile
+    def get_str_cols(self, df):
+        return [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
 
     @profile
     def col_mean(self, df, filter_col):
@@ -116,11 +134,10 @@ class PerformanceTracker(ABC):
         operation = "reading csv"
         df = self.get_operation_stat(operation, self.read_csv, self.data_path)
 
-        if df is None:
-            print("CONVERTING to pandas df")
-            df = self.conn.execute("SELECT * FROM dataframe").df()
+        operation = "get shape"
+        shape = self.get_operation_stat(operation, self.get_shape, df)
 
-        rand_arr = np.random.randint(0, 100, df.shape[0])
+        rand_arr = np.random.randint(0, 100, shape[0])
 
         operation = "add column"
         _ = self.get_operation_stat(operation, self.add_column, df, rand_arr)
@@ -128,11 +145,8 @@ class PerformanceTracker(ABC):
         operation = "get date range"
         _ = self.get_operation_stat(operation, self.get_date_range)
 
-        float_cols = [
-            col
-            for col in df.columns
-            if str(df[col].dtype) in ["float", "Float64", "Float16", "float64"]
-        ]
+        operation = "get float columns"
+        float_cols = self.get_operation_stat(operation, self.get_float_cols, df)
 
         filter_col = np.random.choice(float_cols)
 
@@ -144,7 +158,8 @@ class PerformanceTracker(ABC):
             operation, self.filter_vals, df, filter_col, filter_val
         )
 
-        df_str_cols = [col for col in df.columns if str(df[col].dtype) in ["object", "str", "Utf8"]]
+        operation = "get string columns"
+        df_str_cols = self.get_operation_stat(operation, self.get_str_cols, df)
         groupby_col = np.random.choice(df_str_cols)
 
         operation = "groupby aggregation (sum, mean, std)"
@@ -496,6 +511,13 @@ class DuckdbBench(PerformanceTracker):
         query = f"CREATE OR REPLACE TABLE dataframe AS SELECT * FROM read_csv_auto ('{path}')"
         self.conn.execute(query)
         return None
+    
+    @profile
+    def get_shape(self, df):
+        rows = self.conn.execute("SELECT COUNT(*) AS row_count FROM dataframe").fetchnumpy()['row_count'][0]
+        columns = len(self.conn.execute("DESCRIBE TABLE dataframe").fetchnumpy()['column_name'])
+        shape = (rows, columns)
+        return shape
 
     @profile
     def add_column(self, df, array):
@@ -508,6 +530,18 @@ class DuckdbBench(PerformanceTracker):
         query = "SELECT t.day::date FROM generate_series(timestamp '1990-01-01', timestamp '2050-12-31', interval  '1 day') AS t(day);"
         dates = self.conn.execute(query).fetchnumpy()
         return dates
+
+    @profile
+    def get_float_cols(self, df):
+        described_df = self.conn.execute("DESCRIBE TABLE dataframe").df()
+        float_cols = described_df[described_df['column_type']=="DOUBLE"]['column_name'].unique()
+        return float_cols
+    
+    @profile
+    def get_str_cols(self, df):
+        described_df = self.conn.execute("DESCRIBE TABLE dataframe").df()
+        float_cols = described_df[described_df['column_type']=="VARCHAR"]['column_name'].unique()
+        return float_cols
 
     @profile
     def col_mean(self, df, filter_col):
