@@ -608,7 +608,7 @@ class DuckdbBench(PerformanceTracker):
     @profile
     def describe_df(self, df):
         described = self.conn.execute("SUMMARIZE concat_table").df()
-        return
+        return described
 
     @profile
     def save_to_csv(self, df):
@@ -653,6 +653,7 @@ class DuckdbBench(PerformanceTracker):
 
         t_mid = super().run_operations()
 
+        t_start = time.perf_counter()
         operation = "converting to pandas"
         pd_df = self.get_operation_stat(operation, self.convert_to_pandas)
         del pd_df
@@ -665,6 +666,8 @@ class DuckdbBench(PerformanceTracker):
         arrow_df = self.get_operation_stat(operation, self.convert_to_arrow)
         del arrow_df
 
-        t_final = time.perf_counter() + t_mid
+        t_end = time.perf_counter() - t_start
+        
+        t_final = t_end + t_mid
         gc.collect()
         return t_final
