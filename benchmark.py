@@ -16,7 +16,7 @@ if __name__ == "__main__":
     frameworks = [
         cls(args)
         for cls in PerformanceTracker.__subclasses__()
-        if cls.__name__.split("Bench")[0].lower() in args.frameworks
+        if cls.__name__.split("Bench", maxsplit=1)[0].lower() in args.frameworks
     ]
     logger.critical("Starting Benchmarking...")
 

@@ -670,6 +670,7 @@ class DuckdbBench(PerformanceTracker):
         gc.collect()
         return t_final
 
+
 class SparkPandasBench(PerformanceTracker):
     def __init__(self, args) -> None:
         super().__init__(args)
@@ -749,3 +750,4 @@ class SparkPandasBench(PerformanceTracker):
         logger.critical("%s: Importing modules", self.__class__.__name__)
         self.ps = __import__("pandas")
         return super().run_operations()
+    
