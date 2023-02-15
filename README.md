@@ -1,5 +1,5 @@
 # Benchmarking for data wrangling frameworks
-Currently supported APIs: **[Pandas](https://pandasguide.readthedocs.io/en/latest/), [Modin](https://modin.readthedocs.io/en/stable/), [Polars](https://pola-rs.github.io/polars-book/user-guide/), [DuckDB](https://duckdb.org/docs/api/python/overview)**
+Currently supported APIs: **[Pandas](https://pandasguide.readthedocs.io/en/latest/), [Modin](https://modin.readthedocs.io/en/stable/), [Polars](https://pola-rs.github.io/polars-book/user-guide/), [DuckDB](https://duckdb.org/docs/api/python/overview), [SparkPandas](https://spark.apache.org/docs/latest/api/python/user_guide/pandas_on_spark/index.html)**
 
 ### Operations Tested:
 - read csv
@@ -23,7 +23,18 @@ Currently supported APIs: **[Pandas](https://pandasguide.readthedocs.io/en/lates
 # Usage
 ***Make sure data being read has atleast 1 string column and 1 float column***
 
-## Run with Docker (Recommended)
+
+## Run on venv/conda
+```
+1. pip install -r requirements.txt
+2. python benchmark.py --data_path [data/dir/file.csv]
+```
+
+**Note: if you want to use pandas-on-spark, make sure you have [java](https://www.java.com/en/download/) installed**
+
+Check [here](https://github.com/muneeb-ds/data_benchmark/blob/460692d675a4da092d0ac722c2e3aa59119df44b/utils.py#L12-L23) for all arguments
+
+## Run with Docker
 ```
 1. docker build -t [image-name/tag] .
 2. docker run -v [local/data/storage/dir]:[/container/data/dir] [image-name] \
@@ -33,14 +44,6 @@ Currently supported APIs: **[Pandas](https://pandasguide.readthedocs.io/en/lates
    --frameworks [supported framework names i.e. pandas modin polars]
 ```
 ***if you want to access the output of the tests, make sure that the save_dir is the same as the mounted dir on container***
-
-## Run on venv/conda
-```
-1. pip install -r requirements.txt
-2. python benchmark.py --data_path [data/dir/file.csv]
-```
-
-Check [here](https://github.com/muneeb-ds/data_benchmark/blob/460692d675a4da092d0ac722c2e3aa59119df44b/utils.py#L12-L23) for all arguments
 
 # Further Testing
 
