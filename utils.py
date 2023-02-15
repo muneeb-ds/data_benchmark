@@ -31,8 +31,8 @@ def argument_parser():
         "--frameworks",
         default=["pandas", "modin", "polars"],
         nargs="*",
-        help="frameworks to benchmark on (pandas, modin, polars, duckdb supported)",
-        choices=["pandas", "modin", "polars", "duckdb"],
+        help="frameworks to benchmark on (pandas, modin, polars, duckdb, pandas-on-spark supported)",
+        choices=["pandas", "modin", "polars", "duckdb", "sparkpandas"],
     )
     args = parser.parse_args()
 

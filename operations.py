@@ -592,7 +592,6 @@ class DuckdbBench(PerformanceTracker):
             query += f" COALESCE({col}, 0) AS {col},"
         query += " FROM concat_table"
         df = self.conn.execute(query)
-        return
 
     @profile
     def drop_na(self, df):
@@ -601,9 +600,8 @@ class DuckdbBench(PerformanceTracker):
         for i, col in enumerate(df_cols):
             query += f" {col} IS NOT NULL"
             if i+1 != len(df_cols):
-                query += f" AND"
+                query += " AND"
         self.conn.execute(query)
-        return
 
     @profile
     def describe_df(self, df):
@@ -671,3 +669,83 @@ class DuckdbBench(PerformanceTracker):
         t_final = t_end + t_mid
         gc.collect()
         return t_final
+
+class SparkPandasBench(PerformanceTracker):
+    def __init__(self, args) -> None:
+        super().__init__(args)
+        self.ps = None
+
+    @profile
+    def read_csv(self, path):
+        df = self.ps.read_csv(path)
+        return df
+
+    @profile
+    def read_parquet(self, path):
+        df = self.ps.read_parquet(path)
+        return df
+
+    @profile
+    def add_column(self, df, array):
+        df["rand_nums"] = array
+        return df
+
+    @profile
+    def get_date_range(self):
+        ps_dates = self.ps.date_range(start="1990-01-01", end="2050-12-31")
+        return ps_dates
+
+    @profile
+    def filter_vals(self, df, filter_col, filter_val):
+        return df.loc[df[filter_col] > filter_val, :]
+
+    @profile
+    def groupby(self, df, groupby_col, agg_col):
+        return df.groupby([groupby_col], as_index=False).agg(
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
+        )
+
+    @profile
+    def merge(self, left, right, on):
+        return self.ps.merge(left, right, on=[on], how="left")
+
+    @profile
+    def groupby_merge(self, df, groupby_col, agg_col):
+        grouped = df.groupby([groupby_col], as_index=False).agg(
+            agg_mean=(f"{agg_col}", "mean"),
+            agg_sum=(f"{agg_col}", "sum"),
+            agg_std=(f"{agg_col}", "std"),
+        )
+        return self.ps.merge(df, grouped, on=[groupby_col], how="left")
+
+    @profile
+    def concat(self, df_1, df_2):
+        df_concat = self.ps.concat([df_1, df_2], axis=0)
+        return df_concat
+
+    @profile
+    def fill_na(self, df):
+        return df.fillna(0)
+
+    @profile
+    def drop_na(self, df):
+        return df.dropna()
+
+    @profile
+    def create_df(self, df_dict):
+        return self.ps.DataFrame(df_dict)
+
+    @profile
+    def save_to_csv(self, df):
+        df.to_csv("sample_data.csv", index=False)
+
+    @profile
+    def save_to_parquet(self, df):
+        df.to_parquet("sample_data.parquet", index=False, engine="pyarrow")
+
+    def run_operations(self):
+        logger.critical("%s: Importing modules", self.__class__.__name__)
+        self.ps = __import__("pandas")
+        return super().run_operations()
