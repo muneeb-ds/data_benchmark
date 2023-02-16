@@ -3,6 +3,7 @@ modin
 numpy
 pandas
 polars
+duckdb
 ray
 pyarrow
 pyspark
