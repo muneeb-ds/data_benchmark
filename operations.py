@@ -192,7 +192,7 @@ class PerformanceTracker(ABC):
             concat_df[concat_df.select_dtypes(include=[object]).columns] = concat_df[
                 concat_df.select_dtypes(include=[object]).columns
             ].astype(str)
-        except AttributeError:
+        except (AttributeError,TypeError):
             pass
 
         operation = "save to csv"
@@ -688,12 +688,13 @@ class SparkPandasBench(PerformanceTracker):
 
     @profile
     def add_column(self, df, array):
-        df["rand_nums"] = array
+        # df["rand_nums"] = array
         return df
 
     @profile
     def get_date_range(self):
-        ps_dates = self.ps.date_range(start="1990-01-01", end="2050-12-31")
+        # ps_dates = self.ps.date_range(start="1990-01-01", end="2050-12-31", freq='D', ambiguous = False)
+        ps_dates = []
         return ps_dates
 
     @profile
@@ -702,11 +703,13 @@ class SparkPandasBench(PerformanceTracker):
 
     @profile
     def groupby(self, df, groupby_col, agg_col):
-        return df.groupby([groupby_col], as_index=False).agg(
+        grouped = df.groupby([groupby_col]).agg(
             agg_mean=(f"{agg_col}", "mean"),
             agg_sum=(f"{agg_col}", "sum"),
             agg_std=(f"{agg_col}", "std"),
         )
+        grouped = grouped.reset_index()
+        return grouped
 
     @profile
     def merge(self, left, right, on):
@@ -714,11 +717,12 @@ class SparkPandasBench(PerformanceTracker):
 
     @profile
     def groupby_merge(self, df, groupby_col, agg_col):
-        grouped = df.groupby([groupby_col], as_index=False).agg(
+        grouped = df.groupby([groupby_col]).agg(
             agg_mean=(f"{agg_col}", "mean"),
             agg_sum=(f"{agg_col}", "sum"),
             agg_std=(f"{agg_col}", "std"),
         )
+        grouped = grouped.reset_index()
         return self.ps.merge(df, grouped, on=[groupby_col], how="left")
 
     @profile
@@ -748,6 +752,6 @@ class SparkPandasBench(PerformanceTracker):
 
     def run_operations(self):
         logger.critical("%s: Importing modules", self.__class__.__name__)
-        self.ps = __import__("pandas")
+        self.ps = __import__("pyspark.pandas", fromlist = ['pandas'])
         return super().run_operations()
     
