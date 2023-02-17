@@ -688,13 +688,27 @@ class SparkPandasBench(PerformanceTracker):
 
     @profile
     def add_column(self, df, array):
+        sparkdf = df.to_spark()
+        n = sparkdf.rdd.getNumPartitions()
+
+        # Parallelize and cast to plain integer (np.int64 won't work)
+        new_col = self.sc.parallelize(array, n).map(int) 
+
+        def process(pair):
+            return dict(pair[0].asDict().items() + [("rand_nums", pair[1])])
+
+        rdd = (sparkdf
+            .rdd # Extract RDD
+            .zip(new_col) # Zip with new col
+            .map(process)) # Add new column
+        
+        df = self.spark.createDataFrame(rdd)
         # df["rand_nums"] = array
         return df
 
     @profile
     def get_date_range(self):
-        # ps_dates = self.ps.date_range(start="1990-01-01", end="2050-12-31", freq='D', ambiguous = False)
-        ps_dates = []
+        ps_dates = self.ps.date_range(start="1990-01-01", end="2050-12-31", freq='D')
         return ps_dates
 
     @profile
@@ -752,6 +766,12 @@ class SparkPandasBench(PerformanceTracker):
 
     def run_operations(self):
         logger.critical("%s: Importing modules", self.__class__.__name__)
-        self.ps = __import__("pyspark.pandas", fromlist = ['pandas'])
+        importlib = __import__('importlib')
+        self.ps = importlib.import_module("pyspark.pandas")
+        ps = __import__('pyspark.sql', fromlist=['SparkSession'])
+
+        self.spark = ps.SparkSession.builder.appName('PerformanceBenchmark').getOrCreate()
+        self.sc = self.spark.sparkContext
+
         return super().run_operations()
     
